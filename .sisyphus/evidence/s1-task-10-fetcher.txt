@@ -1,0 +1,36 @@
+==== T10 Fetcher Pool Verification ====
+Date: 2026-03-11T13:00Z
+
+=== Import Test ===
+✅ FetcherPool import OK
+✅ FetchResult fields: ['url', 'final_url', 'status_code', 'headers', 'body', 'redirect_chain', 'response_time_ms', 'content_type', 'error', 'is_redirect']
+
+=== Live Fetch Test ===
+URL: https://books.toscrape.com/
+✅ Status: 200
+✅ Content-Type: text/html
+✅ Body: 51294 bytes
+✅ Response time: 1662ms
+✅ Error: None
+
+=== Redirect Test ===
+URL: http://example.com
+✅ Final URL: http://example.com (no redirect — example.com doesn't redirect)
+✅ Redirect chain length: 0
+
+=== Error Handling Test ===
+URL: http://this-domain-definitely-does-not-exist-12345.com/
+✅ Status: 0 (connection error)
+✅ Error: "Connection error: Cannot connect to host..."
+
+=== Configuration ===
+- TCPConnector: limit=0, limit_per_host=2, ttl_dns_cache=300
+- Timeout: total=30s, connect=10s, sock_read=20s
+- Retry: max 3 attempts, exponential backoff (1,2,4...60s), 429 gets 30,60,120s
+- Manual redirect following with loop detection (max 10 hops)
+- Context manager support (async with)
+
+=== Files Created ===
+- backend/app/crawler/fetcher.py — FetcherPool + FetchResult
+
+VERDICT: PASS ✅

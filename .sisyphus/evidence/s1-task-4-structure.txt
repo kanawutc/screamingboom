@@ -1,0 +1,37 @@
+=== Frontend Route Files ===
+frontend/app/(dashboard)/crawls/[crawlId]/page.tsx
+frontend/app/(dashboard)/crawls/new/page.tsx
+frontend/app/(dashboard)/crawls/page.tsx
+frontend/app/(dashboard)/layout.tsx
+frontend/app/(dashboard)/page.tsx
+frontend/app/layout.tsx
+frontend/app/page.tsx
+frontend/app/providers.tsx
+
+=== Component Files ===
+frontend/components/layout/Sidebar.tsx
+frontend/components/layout/Topbar.tsx
+frontend/components/ui/badge.tsx
+frontend/components/ui/button.tsx
+frontend/components/ui/card.tsx
+frontend/components/ui/dialog.tsx
+frontend/components/ui/dropdown-menu.tsx
+frontend/components/ui/input.tsx
+frontend/components/ui/progress.tsx
+frontend/components/ui/select.tsx
+frontend/components/ui/separator.tsx
+frontend/components/ui/sonner.tsx
+frontend/components/ui/table.tsx
+frontend/components/ui/tabs.tsx
+frontend/components/ui/toast.tsx
+
+=== Lib Files ===
+api-client.ts
+query-client.ts
+utils.ts
+
+=== Types ===
+index.ts
+
+=== Build: PASS ===
+Next.js 16.1.6 build succeeded

@@ -1,0 +1,5 @@
+=== UUID + TSVECTOR Test ===
+UUID gen_random_uuid() OK
+Partition routing OK
+CASCADE delete OK
+TSVECTOR trigger OK

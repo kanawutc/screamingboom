@@ -1,0 +1,44 @@
+VERIFICATION RESULTS - Task 1: Tech Stack + ToC Update
+========================================================
+
+Command: grep -c "selectolax" PLAN.md
+Result: 2 ✓ (appears in Tech Stack table + Architecture diagram)
+
+Command: grep -c "ARQ" PLAN.md
+Result: 2 ✓ (appears in Tech Stack table + Architecture diagram)
+
+Command: grep -c "asyncpg" PLAN.md
+Result: 1 ✓ (appears in Tech Stack table)
+
+Command: grep -c "pybloom" PLAN.md
+Result: 1 ✓ (appears in Tech Stack table)
+
+Command: grep -ci "BeautifulSoup4" PLAN.md
+Result: 1 (appears in Feature 1.1 description only - NOT in Tech Stack table) ✓
+
+Command: grep -ci "Celery" PLAN.md
+Result: 1 (appears in Tech Stack table explanation text only - NOT as a technology) ✓
+
+Command: grep -c "](#" PLAN.md
+Result: 21 ✓ (Table of Contents has 21 anchor links)
+
+Command: grep -c "Table of Contents\|สารบัญ" PLAN.md
+Result: 1 ✓ (Table of Contents section added)
+
+SUMMARY
+=======
+✓ selectolax added to Tech Stack table
+✓ ARQ added to Tech Stack table (replaces Celery)
+✓ asyncpg added to Tech Stack table
+✓ pybloom-live added to Tech Stack table
+✓ Zustand added to Tech Stack table
+✓ TanStack Query v5 added to Tech Stack table
+✓ Nginx added to Tech Stack table
+✓ BeautifulSoup4 removed from Tech Stack table
+✓ Celery removed from Tech Stack table
+✓ Table of Contents section added with 21 anchor links
+✓ V1 scope note added after line 7
+✓ Architecture diagram updated with Nginx, selectolax, ARQ labels
+✓ PLAN.md now contains all required updates
+
+FINAL LINE COUNT: 1020+ lines (was 972, added ~48 lines for ToC)

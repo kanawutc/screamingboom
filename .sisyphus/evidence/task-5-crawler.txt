@@ -1,0 +1,23 @@
+TASK 5: Crawler Engine — Technical Deep Dive Section
+
+VERIFICATION RESULTS:
+=====================
+
+1. File line count: 1904 lines (was 1707, added 197 lines) ✓
+2. Section location: Line 1566 (before UI Layout section) ✓
+3. Bloom filter mentions: 4 occurrences ✓ (requirement: ≥2)
+4. selectolax/lxml mentions: 9 occurrences ✓ (requirement: ≥3)
+5. MinHash/SimHash mentions: 8 occurrences ✓ (requirement: ≥2)
+6. asyncpg/COPY mentions: 10 occurrences ✓ (requirement: ≥2)
+7. rate.limit/Crawl-delay/per-domain mentions: 5 occurrences ✓ (requirement: ≥2)
+
+SECTION CONTENT:
+================
+- 5a. URL Frontier Architecture (Bloom Filter, Redis, deduplication)
+- 5b. Fetcher Pool Design (aiohttp, rate limiting, Crawl-delay, retry logic)
+- 5c. Parser Pipeline (selectolax, lxml, extraction order, SimHash)
+- 5d. SEO Analyzer Pipeline (pluggable analyzers, issue types)
+- 5e. Batch Inserter (asyncpg COPY protocol, buffer strategy)
+- 5f. Post-Crawl Analysis (PageRank, MinHash, orphan detection)
+
+ALL REQUIREMENTS MET ✓

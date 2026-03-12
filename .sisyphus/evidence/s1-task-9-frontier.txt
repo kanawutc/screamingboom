@@ -1,0 +1,41 @@
+==== T9 URL Frontier Verification ====
+Date: 2026-03-11T13:00Z
+
+=== URL Normalization Tests ===
+✅ HTTP://Example.COM/Page#section → http://example.com/Page
+✅ javascript:void(0) → None (rejected)
+✅ ./about with base http://example.com/blog/ → http://example.com/blog/about
+✅ mailto:test@test.com → None (rejected)
+✅ data:text/html,hello → None (rejected)
+✅ tel:+1234567890 → None (rejected)
+✅ http://example.com → http://example.com/ (trailing slash)
+✅ empty string → None
+
+=== URL Hash Tests ===
+✅ url_hash returns 16 bytes (MD5)
+✅ url_hash_hex returns 32 hex chars
+
+=== Domain Extraction ===
+✅ http://example.com/page → example.com
+✅ https://WWW.Example.COM:8080/path → www.example.com:8080
+
+=== BFS Ordering Test ===
+Added URLs at depths 2,0,1,0,2,1 (random order)
+Popped: [0, 0, 1, 1, 2, 2] ✅ BFS order maintained
+
+=== Dedup (Bloom Filter) ===
+✅ First add returns True
+✅ Duplicate add returns False
+
+=== Batch Add ===
+✅ 3 URLs (1 duplicate) → 2 added
+
+=== Max URLs Limit ===
+✅ Frontier with max_urls=3 rejects 4th URL
+
+=== Files Created ===
+- backend/app/crawler/utils.py — URL normalization + hashing
+- backend/app/crawler/frontier.py — URLFrontier class
+- backend/app/crawler/__init__.py — Updated with exports
+
+VERDICT: PASS ✅

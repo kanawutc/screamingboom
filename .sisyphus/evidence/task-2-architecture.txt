@@ -1,0 +1,26 @@
+TASK 2: Architecture Overview Replacement — COMPLETED
+======================================================
+
+Date: 2026-03-11 17:15 GMT+7
+Status: ✅ VERIFIED
+
+VERIFICATION RESULTS:
+- stateDiagram-v2 count: 1 ✅
+- sequenceDiagram count: 1 ✅
+- Component references (URLFrontier|FetcherPool|ParserPool|BatchInserter): 12 ✅
+- Total lines in PLAN.md: 1150 (increased from 1017) ✅
+
+CHANGES MADE:
+1. Replaced old ASCII diagram (lines 60-92) with comprehensive 4-section architecture
+2. Added System Architecture Diagram (detailed 5-layer architecture with Nginx, Frontend, Backend, ARQ Worker, Data Layer)
+3. Added Crawler State Machine (stateDiagram-v2 with 9 states: IDLE, CONFIGURING, QUEUED, CRAWLING, PAUSED, COMPLETING, COMPLETED, FAILED, CANCELLED)
+4. Added Data Flow — URL Lifecycle (sequenceDiagram showing complete URL processing flow)
+5. Added Component Interaction Map (8 components with technology, input/output, characteristics)
+
+CONTENT PRESERVED:
+- Table of Contents (lines 12-43) — unchanged
+- All content from "## Phase 1: Core Crawl Engine" onward — unchanged
+- No git operations performed (no git repo exists)
+
+EVIDENCE:
+File saved to: .sisyphus/evidence/task-2-architecture.txt

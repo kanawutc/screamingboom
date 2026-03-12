@@ -1,0 +1,37 @@
+=== Tables ===
+time="2026-03-11T19:41:00+07:00" level=warning msg="/Users/kc/Desktop/Screaming Frog Clone/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+                    List of relations
+ Schema |      Name       |       Type        |  Owner   
+--------+-----------------+-------------------+----------
+ public | alembic_version | table             | postgres
+ public | crawled_urls    | partitioned table | postgres
+ public | crawled_urls_0  | table             | postgres
+ public | crawled_urls_1  | table             | postgres
+ public | crawled_urls_2  | table             | postgres
+ public | crawled_urls_3  | table             | postgres
+ public | crawls          | table             | postgres
+ public | page_links      | table             | postgres
+ public | projects        | table             | postgres
+ public | redirects       | table             | postgres
+ public | url_issues      | partitioned table | postgres
+ public | url_issues_0    | table             | postgres
+ public | url_issues_1    | table             | postgres
+ public | url_issues_2    | table             | postgres
+ public | url_issues_3    | table             | postgres
+(15 rows)
+
+
+=== Partitions ===
+time="2026-03-11T19:41:01+07:00" level=warning msg="/Users/kc/Desktop/Screaming Frog Clone/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+   tablename    
+----------------
+ crawled_urls_0
+ crawled_urls_1
+ crawled_urls_2
+ crawled_urls_3
+ url_issues_0
+ url_issues_1
+ url_issues_2
+ url_issues_3
+(8 rows)
+

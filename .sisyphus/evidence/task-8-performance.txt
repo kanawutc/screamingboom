@@ -1,0 +1,39 @@
+TASK 8: Performance Strategy Section - COMPLETED
+
+VERIFICATION RESULTS:
+=====================
+
+✓ Performance metrics count (pages/sec|ms|MB|GB): 37 matches (required: ≥10)
+✓ Performance targets (p95|p99|latency|throughput): 5 matches (required: ≥4)
+
+SECTION CONTENT ADDED:
+======================
+
+## Performance Strategy
+
+### 8a. Performance Targets
+- 12 performance metrics with targets and measurement methods
+- Includes: crawl throughput, API response times (p95/p99), memory usage, DB queries, rendering times
+
+### 8b. Scaling Strategy
+- Vertical scaling: thread count, DB connection pool, Redis memory
+- Horizontal scaling: ARQ workers, FastAPI instances, Redis pub/sub
+- Data scaling: PostgreSQL partitioning, keyset pagination, partial indexes
+
+### 8c. Optimization Techniques
+- HTTP layer: DNS caching, keep-alive, response streaming
+- Parsing layer: selectolax (35x faster), decomposition, lxml for XPath
+- Database layer: asyncpg COPY (50k rows/sec), partial indexes, materialized views, TSVECTOR
+- Frontend layer: React Server Components, TanStack Query, virtual scrolling, debounced filters
+- Crawl layer: Bloom filter, Redis pipeline, batch inserter
+
+### 8d. Memory Management
+- 6 memory management strategies for different components
+- Bloom filter persistence, HTML streaming, cursor pagination, batch flushing, ring buffers, TTL expiration
+
+INSERTION POINT:
+================
+Line 2132-2134: Inserted before "## UI Layout (Web App)"
+File size: 2275 → 2461 lines (+186 lines)
+
+VERIFICATION PASSED: All metrics meet or exceed requirements

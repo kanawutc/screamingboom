@@ -1,0 +1,29 @@
+TASK 6: WebSocket Protocol Section — FINAL VERIFICATION
+========================================================
+
+INSERTION VERIFICATION:
+✓ Line 1763: ## WebSocket Protocol (new section)
+✓ Line 1875: ## UI Layout (Web App) (next section)
+✓ Proper placement: WebSocket section inserted between Crawler Engine and UI Layout
+✓ Section separation: --- dividers maintained
+
+CONTENT VERIFICATION:
+✓ 6a. Architecture (Redis Pub/Sub, WebSocketManager)
+✓ 6b. Connection Protocol (endpoint, handshake, heartbeat, reconnection)
+✓ 6c. Message Types (8+ JSON message type definitions)
+✓ 6d. Backpressure Strategy (server-side bounded queue, client-side ring buffer)
+✓ 6e. Frontend Hook Pattern (useCrawlWebSocket hook signature)
+
+GREP VERIFICATION RESULTS:
+✓ "type": count = 13 (required: ≥ 8)
+✓ heartbeat|ping|pong count = 16 (required: ≥ 3)
+✓ backpressure|bounded queue count = 2 (required: ≥ 2)
+✓ reconnect|backoff count = 5 (required: ≥ 2)
+
+PLAN.md GROWTH:
+- Previous size: 1904 lines (after Task 5)
+- New size: 2016 lines
+- Added: 112 lines of WebSocket documentation
+
+TASK STATUS: ✓ COMPLETE
+All verification checks passed. Evidence saved.

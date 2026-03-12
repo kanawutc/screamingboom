@@ -1,0 +1,29 @@
+==== T6 Health Endpoint Verification ====
+Date: 2026-03-11T12:49Z
+
+=== Health Endpoint Response ===
+$ docker compose exec backend curl -s http://localhost:8000/api/v1/health
+{"status":"healthy","version":"0.1.0","services":{"database":"ok","redis":"ok"}}
+
+=== Docs Endpoint ===
+$ docker compose exec backend curl -s http://localhost:8000/api/docs -o /dev/null -w "%{http_code}"
+200
+
+=== OpenAPI Spec ===
+$ docker compose exec backend curl -s http://localhost:8000/api/openapi.json | head
+{"openapi":"3.1.0","info":{"title":"SEO Spider API","description":"Self-hosted Screaming Frog SEO Spider clone","version":"0.1.0"}}
+
+=== Backend Startup Logs (summary) ===
+- 4 gunicorn workers booted (pid 8, 9, 10, 11)
+- Database engine created successfully  
+- asyncpg connection pool created
+- Redis client initialized
+- Application startup complete (all workers)
+
+=== Files Modified in T6 ===
+- backend/app/db/session.py — Added raw asyncpg pool, helper functions
+- backend/app/api/deps.py — Shared Redis client, asyncpg pool dep, type aliases
+- backend/app/api/v1/router.py — Health endpoint checking DB + Redis
+- backend/app/main.py — Lifespan with Redis init/close, CORS from settings
+
+VERDICT: PASS ✅

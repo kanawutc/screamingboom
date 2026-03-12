@@ -1,0 +1,23 @@
+TASK 6: WebSocket Protocol Section Addition
+=============================================
+
+VERIFICATION RESULTS:
+- grep -c '"type":' = 13 (required: ≥ 8) ✓
+- grep -c "heartbeat|ping|pong" = 16 (required: ≥ 3) ✓
+- grep -c "backpressure|bounded queue" = 2 (required: ≥ 2) ✓
+- grep -c "reconnect|backoff" = 5 (required: ≥ 2) ✓
+
+INSERTION POINT:
+- Line 1761: --- (end of Crawler Engine section)
+- Line 1762: (blank)
+- Line 1763: ## UI Layout (Web App) (start of next section)
+- New section inserted between lines 1761-1763
+
+SECTION CONTENT:
+- 6a. Architecture (Redis Pub/Sub, WebSocketManager)
+- 6b. Connection Protocol (endpoint, handshake, heartbeat, reconnection)
+- 6c. Message Types (8+ message type definitions with JSON examples)
+- 6d. Backpressure Strategy (server-side bounded queue, client-side ring buffer)
+- 6e. Frontend Hook Pattern (useCrawlWebSocket hook signature and implementation notes)
+
+ALL VERIFICATION CHECKS PASSED ✓

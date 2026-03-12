@@ -1,0 +1,9 @@
+=== Alembic Migration ===
+Migration 001_initial applied successfully
+
+time="2026-03-11T19:40:58+07:00" level=warning msg="/Users/kc/Desktop/Screaming Frog Clone/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ version_num 
+-------------
+ 001_initial
+(1 row)
+

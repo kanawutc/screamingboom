@@ -1,0 +1,29 @@
+=== File existence check ===
+OK: docker-compose.yml
+OK: docker-compose.dev.yml
+OK: nginx/nginx.conf
+OK: .env.example
+OK: backend/Dockerfile
+OK: frontend/Dockerfile
+
+=== Service count in docker-compose.yml ===
+10
+
+=== Critical nginx directives ===
+1
+OK: WebSocket timeout 3600s
+1
+OK: WebSocket upgrade map
+
+=== Dev overrides ===
+1
+OK: WATCHPACK_POLLING
+2
+OK: WATCHFILES_FORCE_POLLING
+
+=== Worker replicas ===
+      replicas: 1
+
+=== Migrate service ===
+3
+OK: migrate service found
