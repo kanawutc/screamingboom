@@ -59,15 +59,16 @@ def analyze_directives(
             )
         )
 
-    # X-Robots-Tag header present
-    headers = fetch_result.headers if fetch_result.headers else {}
-    if headers.get("x-robots-tag"):
+    # RFC 7230: case-insensitive header lookup
+    headers_lower = {k.lower(): v for k, v in (fetch_result.headers or {}).items()}
+    x_robots_val = headers_lower.get("x-robots-tag")
+    if x_robots_val:
         issues.append(
             _make_issue_tuple(
                 crawl_id,
                 url_id,
                 "has_x_robots_tag",
-                {"value": headers["x-robots-tag"]},
+                {"value": x_robots_val},
             )
         )
 

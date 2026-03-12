@@ -112,6 +112,17 @@ async def start_crawl_job(ctx: dict, crawl_id: str) -> dict:
     ua = _resolve_user_agent(db_config.get("user_agent", "SEOSpider/1.0"))
 
     crawl_mode = row["mode"] or "spider"
+
+    # Phase 3E: Load custom extraction rules for this project
+    extraction_rules: list[dict] = []
+    async with pool.acquire() as conn:
+        rule_rows = await conn.fetch(
+            "SELECT name, selector, selector_type, extract_type, attribute_name "
+            "FROM extraction_rules WHERE project_id = $1",
+            row["project_id"],
+        )
+        extraction_rules = [dict(r) for r in rule_rows]
+
     config = CrawlConfig(
         start_url=db_config.get("start_url", f"https://{row['domain']}"),
         max_urls=db_config.get("max_urls", settings.max_crawl_urls),
@@ -124,6 +135,7 @@ async def start_crawl_job(ctx: dict, crawl_id: str) -> dict:
         max_per_host=db_config.get("max_per_host", 2),
         mode=crawl_mode,
         urls=db_config.get("urls", []),
+        extraction_rules=extraction_rules,
     )
 
     # Listen for control commands (pause/resume/stop) via Redis pub/sub

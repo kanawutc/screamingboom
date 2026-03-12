@@ -35,6 +35,9 @@ async def run_post_crawl_analysis(pool: asyncpg.Pool, crawl_id: uuid.UUID) -> in
 # ---------------------------------------------------------------------------
 
 
+_ALLOWED_DUPLICATE_COLUMNS = frozenset({"title", "meta_description", "h1"})
+
+
 async def _detect_duplicates(
     conn: asyncpg.Connection,
     crawl_id: uuid.UUID,
@@ -43,9 +46,11 @@ async def _detect_duplicates(
     label: str,
 ) -> int:
     """Generic duplicate detection: GROUP BY column HAVING COUNT > 1."""
+    if column not in _ALLOWED_DUPLICATE_COLUMNS:
+        raise ValueError(f"Invalid column for duplicate detection: {column}")
+
     defn = ISSUE_REGISTRY[issue_type]
 
-    # Find duplicate values
     query = f"""
         SELECT {column}, array_agg(id) as url_ids, COUNT(*) as cnt
         FROM crawled_urls

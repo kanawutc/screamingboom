@@ -125,7 +125,7 @@ class RobotsChecker:
 
         Checks in-memory cache → Redis cache → fetch from origin.
         """
-        cache_key = f"{crawl_id}:{domain}"
+        cache_key = f"{crawl_id}:{scheme}:{domain}"
 
         # 1. In-memory cache
         if cache_key in self._parsers:

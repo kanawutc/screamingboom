@@ -53,6 +53,7 @@ class CrawlConfig:
     max_per_host: int = 2
     mode: str = "spider"
     urls: list[str] = field(default_factory=list)
+    extraction_rules: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -334,6 +335,7 @@ class CrawlEngine:
                         result.body,
                         base_url=result.final_url,
                         content_type_header=result.content_type,
+                        extraction_rules=self._config.extraction_rules or None,
                     )
                 except Exception as e:
                     logger.warning("parse_error", url=result.final_url, error=str(e))
@@ -348,11 +350,11 @@ class CrawlEngine:
             # Lowercase header keys for case-insensitive lookup (RFC 7230)
             _headers_lower = {k.lower(): v for k, v in (result.headers or {}).items()}
             x_robots_raw = _headers_lower.get("x-robots-tag", "")
-            if x_robots_raw and page_data:
+            if x_robots_raw:
                 for directive in x_robots_raw.split(","):
                     d = directive.strip().lower()
-                    if d and d not in page_data.robots_meta:
-                        page_data.robots_meta.append(d)
+                    if d and d not in effective_page_data.robots_meta:
+                        effective_page_data.robots_meta.append(d)
 
             # --- Sprint 2: T6 — Enrich indexability beyond just noindex ---
             self._enrich_indexability(effective_page_data, result, url)

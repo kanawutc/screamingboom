@@ -39,3 +39,16 @@ class CrawledUrlDetail(CrawledUrlResponse):
 
     redirect_chain: list | None = None
     seo_data: dict = Field(default_factory=dict)
+
+
+class ExternalLinkResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    target_url: str
+    source_url: str
+    source_url_id: uuid.UUID
+    anchor_text: str | None = None
+    rel_attrs: list[str] | None = None
+    link_position: str | None = None
+    is_javascript: bool = False
