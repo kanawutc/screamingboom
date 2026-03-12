@@ -113,9 +113,7 @@ class FetcherPool:
         if self._session is None or self._session.closed:
             raise RuntimeError("FetcherPool not started. Call start() or use as context manager.")
 
-        start = time.monotonic()
         result = await self._fetch_with_retry(url, max_retries)
-        result.response_time_ms = int((time.monotonic() - start) * 1000)
         return result
 
     # ------------------------------------------------------------------
@@ -127,7 +125,9 @@ class FetcherPool:
         last_result: FetchResult | None = None
 
         for attempt in range(max_retries + 1):
+            fetch_start = time.monotonic()
             result = await self._fetch_once(url)
+            result.response_time_ms = int((time.monotonic() - fetch_start) * 1000)
             last_result = result
 
             # Success or non-retryable status

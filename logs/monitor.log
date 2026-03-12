@@ -1409,3 +1409,341 @@
 [2026-03-12 14:30:41] [OK     ] Active crawls: none stuck
 [2026-03-12 14:30:41] [INFO   ] Status: HEALTHY  |  Checks: 115  |  Fixes applied: 0
 [2026-03-12 14:30:41] [INFO   ] 
+[2026-03-12 14:35:42] [INFO   ] ============================================================
+[2026-03-12 14:35:42] [INFO   ] Health Check #116
+[2026-03-12 14:35:42] [INFO   ] ============================================================
+[2026-03-12 14:35:42] [OK     ] Containers: all 5 running
+[2026-03-12 14:35:42] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 14:35:42] [OK     ] Frontend: serving (200)
+[2026-03-12 14:35:42] [OK     ] API endpoints: all responding
+[2026-03-12 14:35:42] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 14:35:42] [OK     ] Disk space: OK
+[2026-03-12 14:35:42] [OK     ] Active crawls: none stuck
+[2026-03-12 14:35:42] [INFO   ] Status: HEALTHY  |  Checks: 116  |  Fixes applied: 0
+[2026-03-12 14:35:42] [INFO   ] 
+[2026-03-12 14:40:43] [INFO   ] ============================================================
+[2026-03-12 14:40:43] [INFO   ] Health Check #117
+[2026-03-12 14:40:43] [INFO   ] ============================================================
+[2026-03-12 14:40:44] [OK     ] Containers: all 5 running
+[2026-03-12 14:40:44] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 14:40:44] [OK     ] Frontend: serving (200)
+[2026-03-12 14:40:44] [OK     ] API endpoints: all responding
+[2026-03-12 14:40:44] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 14:40:44] [OK     ] Disk space: OK
+[2026-03-12 14:40:44] [OK     ] Active crawls: none stuck
+[2026-03-12 14:40:44] [INFO   ] Status: HEALTHY  |  Checks: 117  |  Fixes applied: 0
+[2026-03-12 14:40:44] [INFO   ] 
+[2026-03-12 14:45:45] [INFO   ] ============================================================
+[2026-03-12 14:45:45] [INFO   ] Health Check #118
+[2026-03-12 14:45:45] [INFO   ] ============================================================
+[2026-03-12 14:45:45] [OK     ] Containers: all 5 running
+[2026-03-12 14:45:45] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 14:45:45] [OK     ] Frontend: serving (200)
+[2026-03-12 14:45:45] [OK     ] API endpoints: all responding
+[2026-03-12 14:45:45] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 14:45:45] [OK     ] Disk space: OK
+[2026-03-12 14:45:45] [OK     ] Active crawls: none stuck
+[2026-03-12 14:45:45] [INFO   ] Status: HEALTHY  |  Checks: 118  |  Fixes applied: 0
+[2026-03-12 14:45:45] [INFO   ] 
+[2026-03-12 14:50:46] [INFO   ] ============================================================
+[2026-03-12 14:50:46] [INFO   ] Health Check #119
+[2026-03-12 14:50:46] [INFO   ] ============================================================
+[2026-03-12 14:50:46] [OK     ] Containers: all 5 running
+[2026-03-12 14:50:47] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 14:50:47] [OK     ] Frontend: serving (200)
+[2026-03-12 14:50:47] [OK     ] API endpoints: all responding
+[2026-03-12 14:50:47] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 14:50:47] [OK     ] Disk space: OK
+[2026-03-12 14:50:47] [OK     ] Active crawls: none stuck
+[2026-03-12 14:50:47] [INFO   ] Status: HEALTHY  |  Checks: 119  |  Fixes applied: 0
+[2026-03-12 14:50:47] [INFO   ] 
+[2026-03-12 14:55:48] [INFO   ] ============================================================
+[2026-03-12 14:55:48] [INFO   ] Health Check #120
+[2026-03-12 14:55:48] [INFO   ] ============================================================
+[2026-03-12 14:55:48] [OK     ] Containers: all 5 running
+[2026-03-12 14:55:48] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 14:55:48] [OK     ] Frontend: serving (200)
+[2026-03-12 14:55:48] [OK     ] API endpoints: all responding
+[2026-03-12 14:55:48] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 14:55:48] [OK     ] Disk space: OK
+[2026-03-12 14:55:48] [OK     ] Active crawls: none stuck
+[2026-03-12 14:55:48] [INFO   ] Status: HEALTHY  |  Checks: 120  |  Fixes applied: 0
+[2026-03-12 14:55:48] [INFO   ] 
+[2026-03-12 15:00:49] [INFO   ] ============================================================
+[2026-03-12 15:00:49] [INFO   ] Health Check #121
+[2026-03-12 15:00:49] [INFO   ] ============================================================
+[2026-03-12 15:00:50] [OK     ] Containers: all 5 running
+[2026-03-12 15:00:50] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:00:50] [OK     ] Frontend: serving (200)
+[2026-03-12 15:00:50] [OK     ] API endpoints: all responding
+[2026-03-12 15:00:50] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 15:00:50] [OK     ] Disk space: OK
+[2026-03-12 15:00:50] [OK     ] Active crawls: none stuck
+[2026-03-12 15:00:50] [INFO   ] Status: HEALTHY  |  Checks: 121  |  Fixes applied: 0
+[2026-03-12 15:00:50] [INFO   ] 
+[2026-03-12 15:05:51] [INFO   ] ============================================================
+[2026-03-12 15:05:51] [INFO   ] Health Check #122
+[2026-03-12 15:05:51] [INFO   ] ============================================================
+[2026-03-12 15:05:51] [ERROR  ] Container screamingfrogclone-worker-1 is NOT running
+[2026-03-12 15:05:51] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:05:51] [OK     ] Frontend: serving (200)
+[2026-03-12 15:05:51] [OK     ] API endpoints: all responding
+[2026-03-12 15:05:51] [WARN   ] [worker] 3 error(s) in last 6min: Traceback (most recent call last):
+[2026-03-12 15:05:51] [OK     ] Disk space: OK
+[2026-03-12 15:05:51] [OK     ] Active crawls: none stuck
+[2026-03-12 15:05:51] [INFO   ] Status: DEGRADED (2 issue(s))  |  Checks: 122  |  Fixes applied: 0
+[2026-03-12 15:05:51] [INFO   ] 
+[2026-03-12 15:10:52] [INFO   ] ============================================================
+[2026-03-12 15:10:52] [INFO   ] Health Check #123
+[2026-03-12 15:10:52] [INFO   ] ============================================================
+[2026-03-12 15:10:52] [ERROR  ] Container screamingfrogclone-worker-1 is NOT running
+[2026-03-12 15:10:52] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:10:52] [OK     ] Frontend: serving (200)
+[2026-03-12 15:10:52] [OK     ] API endpoints: all responding
+[2026-03-12 15:10:53] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 15:10:53] [OK     ] Disk space: OK
+[2026-03-12 15:10:53] [OK     ] Active crawls: none stuck
+[2026-03-12 15:10:53] [FIX    ] Auto-fix: restarting worker (failed 2x)
+[2026-03-12 15:10:53] [FIX    ] Auto-fix actions: ['Restarted worker']
+[2026-03-12 15:10:53] [INFO   ] Status: DEGRADED (1 issue(s))  |  Checks: 123  |  Fixes applied: 1
+[2026-03-12 15:10:53] [INFO   ] 
+[2026-03-12 15:15:54] [INFO   ] ============================================================
+[2026-03-12 15:15:54] [INFO   ] Health Check #124
+[2026-03-12 15:15:54] [INFO   ] ============================================================
+[2026-03-12 15:15:54] [OK     ] Containers: all 5 running
+[2026-03-12 15:15:54] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:15:54] [OK     ] Frontend: serving (200)
+[2026-03-12 15:15:54] [OK     ] API endpoints: all responding
+[2026-03-12 15:15:54] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 15:15:54] [OK     ] Disk space: OK
+[2026-03-12 15:15:54] [OK     ] Active crawls: none stuck
+[2026-03-12 15:15:54] [INFO   ] Status: HEALTHY  |  Checks: 124  |  Fixes applied: 1
+[2026-03-12 15:15:54] [INFO   ] 
+[2026-03-12 15:20:55] [INFO   ] ============================================================
+[2026-03-12 15:20:55] [INFO   ] Health Check #125
+[2026-03-12 15:20:55] [INFO   ] ============================================================
+[2026-03-12 15:20:56] [OK     ] Containers: all 5 running
+[2026-03-12 15:20:56] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:20:56] [OK     ] Frontend: serving (200)
+[2026-03-12 15:20:56] [OK     ] API endpoints: all responding
+[2026-03-12 15:20:56] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 15:20:56] [OK     ] Disk space: OK
+[2026-03-12 15:20:56] [OK     ] Active crawls: none stuck
+[2026-03-12 15:20:56] [INFO   ] Status: HEALTHY  |  Checks: 125  |  Fixes applied: 1
+[2026-03-12 15:20:56] [INFO   ] 
+[2026-03-12 15:25:57] [INFO   ] ============================================================
+[2026-03-12 15:25:57] [INFO   ] Health Check #126
+[2026-03-12 15:25:57] [INFO   ] ============================================================
+[2026-03-12 15:25:57] [OK     ] Containers: all 5 running
+[2026-03-12 15:25:57] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:25:57] [OK     ] Frontend: serving (200)
+[2026-03-12 15:25:57] [OK     ] API endpoints: all responding
+[2026-03-12 15:25:57] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 15:25:57] [OK     ] Disk space: OK
+[2026-03-12 15:25:57] [OK     ] Active crawls: none stuck
+[2026-03-12 15:25:57] [INFO   ] Status: HEALTHY  |  Checks: 126  |  Fixes applied: 1
+[2026-03-12 15:25:57] [INFO   ] 
+[2026-03-12 15:30:58] [INFO   ] ============================================================
+[2026-03-12 15:30:58] [INFO   ] Health Check #127
+[2026-03-12 15:30:58] [INFO   ] ============================================================
+[2026-03-12 15:30:59] [OK     ] Containers: all 5 running
+[2026-03-12 15:30:59] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:30:59] [OK     ] Frontend: serving (200)
+[2026-03-12 15:30:59] [OK     ] API endpoints: all responding
+[2026-03-12 15:30:59] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 15:30:59] [OK     ] Disk space: OK
+[2026-03-12 15:30:59] [OK     ] Active crawls: none stuck
+[2026-03-12 15:30:59] [INFO   ] Status: HEALTHY  |  Checks: 127  |  Fixes applied: 1
+[2026-03-12 15:30:59] [INFO   ] 
+[2026-03-12 15:36:00] [INFO   ] ============================================================
+[2026-03-12 15:36:00] [INFO   ] Health Check #128
+[2026-03-12 15:36:00] [INFO   ] ============================================================
+[2026-03-12 15:36:00] [OK     ] Containers: all 5 running
+[2026-03-12 15:36:00] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:36:00] [OK     ] Frontend: serving (200)
+[2026-03-12 15:36:00] [OK     ] API endpoints: all responding
+[2026-03-12 15:36:00] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 15:36:00] [OK     ] Disk space: OK
+[2026-03-12 15:36:00] [OK     ] Active crawls: none stuck
+[2026-03-12 15:36:00] [INFO   ] Status: HEALTHY  |  Checks: 128  |  Fixes applied: 1
+[2026-03-12 15:36:00] [INFO   ] 
+[2026-03-12 15:41:02] [INFO   ] ============================================================
+[2026-03-12 15:41:02] [INFO   ] Health Check #129
+[2026-03-12 15:41:02] [INFO   ] ============================================================
+[2026-03-12 15:41:02] [OK     ] Containers: all 5 running
+[2026-03-12 15:41:02] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:41:02] [OK     ] Frontend: serving (200)
+[2026-03-12 15:41:02] [OK     ] API endpoints: all responding
+[2026-03-12 15:41:03] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 15:41:03] [OK     ] Disk space: OK
+[2026-03-12 15:41:03] [OK     ] Active crawls: none stuck
+[2026-03-12 15:41:03] [INFO   ] Status: HEALTHY  |  Checks: 129  |  Fixes applied: 1
+[2026-03-12 15:41:03] [INFO   ] 
+[2026-03-12 15:46:04] [INFO   ] ============================================================
+[2026-03-12 15:46:04] [INFO   ] Health Check #130
+[2026-03-12 15:46:04] [INFO   ] ============================================================
+[2026-03-12 15:46:05] [OK     ] Containers: all 5 running
+[2026-03-12 15:46:05] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:46:05] [OK     ] Frontend: serving (200)
+[2026-03-12 15:46:05] [OK     ] API endpoints: all responding
+[2026-03-12 15:46:05] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 15:46:05] [OK     ] Disk space: OK
+[2026-03-12 15:46:05] [OK     ] Active crawls: none stuck
+[2026-03-12 15:46:05] [INFO   ] Status: HEALTHY  |  Checks: 130  |  Fixes applied: 1
+[2026-03-12 15:46:05] [INFO   ] 
+[2026-03-12 15:51:07] [INFO   ] ============================================================
+[2026-03-12 15:51:07] [INFO   ] Health Check #131
+[2026-03-12 15:51:07] [INFO   ] ============================================================
+[2026-03-12 15:51:07] [OK     ] Containers: all 5 running
+[2026-03-12 15:51:07] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:51:07] [OK     ] Frontend: serving (200)
+[2026-03-12 15:51:07] [OK     ] API endpoints: all responding
+[2026-03-12 15:51:07] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 15:51:07] [OK     ] Disk space: OK
+[2026-03-12 15:51:07] [OK     ] Active crawls: none stuck
+[2026-03-12 15:51:07] [INFO   ] Status: HEALTHY  |  Checks: 131  |  Fixes applied: 1
+[2026-03-12 15:51:07] [INFO   ] 
+[2026-03-12 15:56:09] [INFO   ] ============================================================
+[2026-03-12 15:56:09] [INFO   ] Health Check #132
+[2026-03-12 15:56:09] [INFO   ] ============================================================
+[2026-03-12 15:56:09] [OK     ] Containers: all 5 running
+[2026-03-12 15:56:09] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 15:56:09] [OK     ] Frontend: serving (200)
+[2026-03-12 15:56:09] [OK     ] API endpoints: all responding
+[2026-03-12 15:56:09] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 15:56:10] [OK     ] Disk space: OK
+[2026-03-12 15:56:10] [OK     ] Active crawls: none stuck
+[2026-03-12 15:56:10] [INFO   ] Status: HEALTHY  |  Checks: 132  |  Fixes applied: 1
+[2026-03-12 15:56:10] [INFO   ] 
+[2026-03-12 16:01:11] [INFO   ] ============================================================
+[2026-03-12 16:01:11] [INFO   ] Health Check #133
+[2026-03-12 16:01:11] [INFO   ] ============================================================
+[2026-03-12 16:01:11] [OK     ] Containers: all 5 running
+[2026-03-12 16:01:12] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 16:01:12] [OK     ] Frontend: serving (200)
+[2026-03-12 16:01:12] [OK     ] API endpoints: all responding
+[2026-03-12 16:01:12] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 16:01:12] [OK     ] Disk space: OK
+[2026-03-12 16:01:12] [OK     ] Active crawls: none stuck
+[2026-03-12 16:01:12] [INFO   ] Status: HEALTHY  |  Checks: 133  |  Fixes applied: 1
+[2026-03-12 16:01:12] [INFO   ] 
+[2026-03-12 16:06:14] [INFO   ] ============================================================
+[2026-03-12 16:06:14] [INFO   ] Health Check #134
+[2026-03-12 16:06:14] [INFO   ] ============================================================
+[2026-03-12 16:06:14] [OK     ] Containers: all 5 running
+[2026-03-12 16:06:14] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 16:06:14] [OK     ] Frontend: serving (200)
+[2026-03-12 16:06:14] [OK     ] API endpoints: all responding
+[2026-03-12 16:06:14] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 16:06:14] [OK     ] Disk space: OK
+[2026-03-12 16:06:14] [OK     ] Active crawls: none stuck
+[2026-03-12 16:06:14] [INFO   ] Status: HEALTHY  |  Checks: 134  |  Fixes applied: 1
+[2026-03-12 16:06:14] [INFO   ] 
+[2026-03-12 16:11:16] [INFO   ] ============================================================
+[2026-03-12 16:11:16] [INFO   ] Health Check #135
+[2026-03-12 16:11:16] [INFO   ] ============================================================
+[2026-03-12 16:11:16] [OK     ] Containers: all 5 running
+[2026-03-12 16:11:16] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 16:11:16] [OK     ] Frontend: serving (200)
+[2026-03-12 16:11:16] [OK     ] API endpoints: all responding
+[2026-03-12 16:11:16] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 16:11:16] [OK     ] Disk space: OK
+[2026-03-12 16:11:16] [OK     ] Active crawls: none stuck
+[2026-03-12 16:11:16] [INFO   ] Status: HEALTHY  |  Checks: 135  |  Fixes applied: 1
+[2026-03-12 16:11:16] [INFO   ] 
+[2026-03-12 16:16:18] [INFO   ] ============================================================
+[2026-03-12 16:16:18] [INFO   ] Health Check #136
+[2026-03-12 16:16:18] [INFO   ] ============================================================
+[2026-03-12 16:16:18] [OK     ] Containers: all 5 running
+[2026-03-12 16:16:18] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 16:16:18] [OK     ] Frontend: serving (200)
+[2026-03-12 16:16:18] [OK     ] API endpoints: all responding
+[2026-03-12 16:16:19] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 16:16:19] [OK     ] Disk space: OK
+[2026-03-12 16:16:19] [OK     ] Active crawls: none stuck
+[2026-03-12 16:16:19] [INFO   ] Status: HEALTHY  |  Checks: 136  |  Fixes applied: 1
+[2026-03-12 16:16:19] [INFO   ] 
+[2026-03-12 16:21:20] [INFO   ] ============================================================
+[2026-03-12 16:21:20] [INFO   ] Health Check #137
+[2026-03-12 16:21:20] [INFO   ] ============================================================
+[2026-03-12 16:21:21] [OK     ] Containers: all 5 running
+[2026-03-12 16:21:21] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 16:21:21] [OK     ] Frontend: serving (200)
+[2026-03-12 16:21:21] [OK     ] API endpoints: all responding
+[2026-03-12 16:21:21] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 16:21:21] [OK     ] Disk space: OK
+[2026-03-12 16:21:21] [OK     ] Active crawls: none stuck
+[2026-03-12 16:21:21] [INFO   ] Status: HEALTHY  |  Checks: 137  |  Fixes applied: 1
+[2026-03-12 16:21:21] [INFO   ] 
+[2026-03-12 16:26:22] [INFO   ] ============================================================
+[2026-03-12 16:26:22] [INFO   ] Health Check #138
+[2026-03-12 16:26:22] [INFO   ] ============================================================
+[2026-03-12 16:26:22] [OK     ] Containers: all 5 running
+[2026-03-12 16:26:22] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 16:26:23] [OK     ] Frontend: serving (200)
+[2026-03-12 16:26:23] [OK     ] API endpoints: all responding
+[2026-03-12 16:26:23] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 16:26:23] [OK     ] Disk space: OK
+[2026-03-12 16:26:23] [OK     ] Active crawls: none stuck
+[2026-03-12 16:26:23] [INFO   ] Status: HEALTHY  |  Checks: 138  |  Fixes applied: 1
+[2026-03-12 16:26:23] [INFO   ] 
+[2026-03-12 16:31:24] [INFO   ] ============================================================
+[2026-03-12 16:31:24] [INFO   ] Health Check #139
+[2026-03-12 16:31:24] [INFO   ] ============================================================
+[2026-03-12 16:31:24] [ERROR  ] Container screamingfrogclone-backend-1 health=starting
+[2026-03-12 16:31:24] [ERROR  ] API health unreachable (curl exit=56)
+[2026-03-12 16:31:24] [ERROR  ] Frontend unreachable (curl exit=56)
+[2026-03-12 16:31:24] [WARN   ] GET http://localhost/api/v1/projects?limit=1 — unreachable
+[2026-03-12 16:31:24] [WARN   ] [nginx] 2 error(s) in last 6min: 2026/03/12 09:27:41 [error] 27#27: *11 connect() failed (111: Connection refused) while connecting to upstream, client: 151.101.88.223, server: localhost, request: "GET /api/v1/crawls/b16f11b8-24f3-4b
+[2026-03-12 16:31:24] [OK     ] Disk space: OK
+[2026-03-12 16:31:24] [OK     ] Active crawls: none stuck
+[2026-03-12 16:31:24] [INFO   ] Status: DEGRADED (5 issue(s))  |  Checks: 139  |  Fixes applied: 1
+[2026-03-12 16:31:24] [INFO   ] 
+[2026-03-12 16:36:25] [INFO   ] ============================================================
+[2026-03-12 16:36:25] [INFO   ] Health Check #140
+[2026-03-12 16:36:25] [INFO   ] ============================================================
+[2026-03-12 16:36:25] [OK     ] Containers: all 5 running
+[2026-03-12 16:36:25] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 16:36:25] [OK     ] Frontend: serving (200)
+[2026-03-12 16:36:25] [OK     ] API endpoints: all responding
+[2026-03-12 16:36:26] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 16:36:26] [OK     ] Disk space: OK
+[2026-03-12 16:36:26] [OK     ] Active crawls: none stuck
+[2026-03-12 16:36:26] [INFO   ] Status: HEALTHY  |  Checks: 140  |  Fixes applied: 1
+[2026-03-12 16:36:26] [INFO   ] 
+[2026-03-12 16:41:27] [INFO   ] ============================================================
+[2026-03-12 16:41:27] [INFO   ] Health Check #141
+[2026-03-12 16:41:27] [INFO   ] ============================================================
+[2026-03-12 16:41:27] [OK     ] Containers: all 5 running
+[2026-03-12 16:41:27] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 16:41:27] [OK     ] Frontend: serving (200)
+[2026-03-12 16:41:27] [OK     ] API endpoints: all responding
+[2026-03-12 16:41:27] [WARN   ] [nginx] 2 error(s) in last 6min: 2026/03/12 09:37:21 [error] 36#36: *67 connect() failed (111: Connection refused) while connecting to upstream, client: 151.101.88.223, server: localhost, request: "GET /api/v1/crawls/4b6f5c09-1a69-48
+[2026-03-12 16:41:27] [OK     ] Disk space: OK
+[2026-03-12 16:41:27] [OK     ] Active crawls: none stuck
+[2026-03-12 16:41:27] [INFO   ] Status: HEALTHY  |  Checks: 141  |  Fixes applied: 1
+[2026-03-12 16:41:27] [INFO   ] 
+[2026-03-12 16:46:28] [INFO   ] ============================================================
+[2026-03-12 16:46:28] [INFO   ] Health Check #142
+[2026-03-12 16:46:28] [INFO   ] ============================================================
+[2026-03-12 16:46:28] [OK     ] Containers: all 5 running
+[2026-03-12 16:46:28] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 16:46:28] [OK     ] Frontend: serving (200)
+[2026-03-12 16:46:28] [OK     ] API endpoints: all responding
+[2026-03-12 16:46:29] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 16:46:29] [OK     ] Disk space: OK
+[2026-03-12 16:46:29] [OK     ] Active crawls: none stuck
+[2026-03-12 16:46:29] [INFO   ] Status: HEALTHY  |  Checks: 142  |  Fixes applied: 1
+[2026-03-12 16:46:29] [INFO   ] 
+[2026-03-12 16:51:30] [INFO   ] ============================================================
+[2026-03-12 16:51:30] [INFO   ] Health Check #143
+[2026-03-12 16:51:30] [INFO   ] ============================================================
+[2026-03-12 16:51:30] [OK     ] Containers: all 5 running
+[2026-03-12 16:51:30] [OK     ] API health: healthy (db=ok, redis=ok)
+[2026-03-12 16:51:30] [OK     ] Frontend: serving (200)
+[2026-03-12 16:51:30] [OK     ] API endpoints: all responding
+[2026-03-12 16:51:30] [OK     ] Container logs: clean (no critical errors)
+[2026-03-12 16:51:30] [OK     ] Disk space: OK
+[2026-03-12 16:51:30] [OK     ] Active crawls: none stuck
+[2026-03-12 16:51:30] [INFO   ] Status: HEALTHY  |  Checks: 143  |  Fixes applied: 1
+[2026-03-12 16:51:30] [INFO   ] 

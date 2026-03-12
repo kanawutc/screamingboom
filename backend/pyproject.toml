@@ -25,6 +25,7 @@ dependencies = [
     "httptools>=0.6.1",
     "uvloop>=0.20.0",
     "pybloom-live>=3.0.0",
+    "openpyxl>=3.1.0",
 ]
 
 [project.optional-dependencies]

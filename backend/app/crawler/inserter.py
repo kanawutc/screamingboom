@@ -118,6 +118,10 @@ class BatchInserter:
         if page_data.mixed_content_urls:
             seo_data["mixed_content_urls"] = page_data.mixed_content_urls
 
+        # Phase 3E: Custom extraction results
+        if page_data.custom_extractions:
+            seo_data["custom_extractions"] = page_data.custom_extractions
+
         # Sprint 2: Security headers from response
         # Lowercase keys for case-insensitive lookup (HTTP headers are case-insensitive per RFC 7230)
         headers = {k.lower(): v for k, v in (fetch_result.headers or {}).items()}

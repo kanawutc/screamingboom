@@ -91,6 +91,9 @@ class PageData:
     heading_sequence: list[str] = field(default_factory=list)  # ["h1","h2","h2","h3",...]
     mixed_content_urls: list[str] = field(default_factory=list)
 
+    # Phase 3E: Custom extraction rules results
+    custom_extractions: dict = field(default_factory=dict)
+
 
 class ParserPool:
     """Stateless HTML parser using selectolax.
@@ -106,6 +109,7 @@ class ParserPool:
         html_content: bytes | str,
         base_url: str,
         content_type_header: str | None = None,
+        extraction_rules: list[dict] | None = None,
     ) -> PageData:
         """Parse HTML and extract all SEO-relevant data.
 
@@ -149,6 +153,10 @@ class ParserPool:
 
         # Determine indexability from robots meta
         self._determine_indexability(data)
+
+        # Phase 3E: Apply custom extraction rules
+        if extraction_rules:
+            self._apply_custom_extractions(tree, html_str, data, extraction_rules)
 
         return data
 
@@ -458,7 +466,105 @@ class ParserPool:
                 if val and val.startswith("http://"):
                     mixed.append(val)
 
+        # Check img srcset for mixed content (responsive images)
+        for node in tree.css("img[srcset]"):
+            srcset = node.attributes.get("srcset", "")
+            for entry in srcset.split(","):
+                src = entry.strip().split()[0] if entry.strip() else ""
+                if src.startswith("http://"):
+                    mixed.append(src)
+
         data.mixed_content_urls = mixed[:50]  # Cap at 50 to avoid bloating seo_data
+
+    # ------------------------------------------------------------------
+    # Custom extraction rules (Phase 3E)
+    # ------------------------------------------------------------------
+
+    def _apply_custom_extractions(
+        self,
+        tree: HTMLParser,
+        html_str: str,
+        data: PageData,
+        rules: list[dict],
+    ) -> None:
+        for rule in rules:
+            name = rule.get("name", "")
+            selector = rule.get("selector", "")
+            selector_type = rule.get("selector_type", "css")
+            extract_type = rule.get("extract_type", "text")
+            attribute_name = rule.get("attribute_name", "")
+
+            if not name or not selector:
+                continue
+
+            try:
+                if selector_type == "xpath":
+                    data.custom_extractions[name] = self._extract_xpath(
+                        html_str, selector, extract_type, attribute_name
+                    )
+                else:
+                    data.custom_extractions[name] = self._extract_css(
+                        tree, selector, extract_type, attribute_name
+                    )
+            except Exception as exc:
+                logger.debug(
+                    "custom_extraction_failed",
+                    rule_name=name,
+                    selector=selector,
+                    error=str(exc),
+                )
+                data.custom_extractions[name] = None
+
+    def _extract_css(
+        self,
+        tree: HTMLParser,
+        selector: str,
+        extract_type: str,
+        attribute_name: str,
+    ) -> str | int | None:
+        nodes = tree.css(selector)
+        if extract_type == "count":
+            return len(nodes)
+        if not nodes:
+            return None
+        node = nodes[0]
+        if extract_type == "attribute" and attribute_name:
+            return node.attributes.get(attribute_name)
+        if extract_type == "html":
+            return node.html
+        # default: text
+        return node.text(strip=True)
+
+    def _extract_xpath(
+        self,
+        html_str: str,
+        selector: str,
+        extract_type: str,
+        attribute_name: str,
+    ) -> str | int | None:
+        from lxml import etree
+
+        doc = etree.HTML(html_str)
+        if doc is None:
+            return None
+        results = doc.xpath(selector)
+        if extract_type == "count":
+            return len(results) if isinstance(results, list) else (1 if results else 0)
+        if not results:
+            return None
+        el = results[0] if isinstance(results, list) else results
+        if isinstance(el, str):
+            return el
+        if extract_type == "attribute" and attribute_name:
+            return el.get(attribute_name) if hasattr(el, "get") else None
+        if extract_type == "html":
+            return etree.tostring(el, encoding="unicode", method="html")
+        # default: text
+        return (
+            etree.tostring(el, method="text", encoding="unicode").strip()
+            if hasattr(el, "tag")
+            else str(el)
+        )
 
     # ------------------------------------------------------------------
     # Indexability
