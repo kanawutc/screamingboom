@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.models.crawl import Crawl
 from app.repositories.crawl_repo import CrawlRepository
 from app.repositories.url_repo import UrlRepository
-from app.schemas.crawl import CrawlCreate
+from app.schemas.crawl import CrawlContinue, CrawlCreate
 
 logger = structlog.get_logger(__name__)
 
@@ -86,6 +86,64 @@ class CrawlService:
         except Exception as e:
             logger.error("crawl_enqueue_failed", crawl_id=str(crawl.id), error=str(e))
             # Revert status to failed if enqueue fails
+            await self._repo.update_status(crawl.id, "failed")
+            await self._session.commit()
+            raise
+
+        return crawl
+
+    async def continue_crawl(
+        self,
+        parent_crawl_id: uuid.UUID,
+        data: CrawlContinue,
+    ) -> Crawl:
+        """Create a child crawl that continues from a parent's uncrawled links."""
+        parent = await self._repo.get_by_id(parent_crawl_id)
+        if parent is None:
+            raise ValueError("Parent crawl not found")
+
+        if parent.status not in ("completed", "failed", "cancelled"):
+            raise ValueError("Parent crawl is still running")
+
+        # Copy config from parent and add continuation fields
+        parent_config = dict(parent.config) if parent.config else {}
+        config_dict: dict[str, Any] = {
+            "start_url": parent_config.get("start_url", ""),
+            "max_urls": data.additional_urls if data.additional_urls > 0 else 0,
+            "max_depth": parent_config.get("max_depth", 10),
+            "max_threads": parent_config.get("max_threads", 5),
+            "rate_limit_rps": parent_config.get("rate_limit_rps", 2.0),
+            "user_agent": parent_config.get("user_agent", "SEOSpider/1.0"),
+            "respect_robots": parent_config.get("respect_robots", True),
+            "parent_crawl_id": str(parent_crawl_id),
+        }
+
+        crawl = await self._repo.create_crawl(
+            project_id=parent.project_id,
+            mode=parent.mode,
+            config=config_dict,
+        )
+        await self._repo.update_status(crawl.id, "queued")
+        await self._session.commit()
+        await self._session.refresh(crawl)
+
+        # Enqueue ARQ job
+        try:
+            arq_redis = ArqRedis(
+                pool_or_conn=self._redis.connection_pool,
+                default_queue_name="arq:queue",
+            )
+            await arq_redis.enqueue_job(
+                "start_crawl_job",
+                str(crawl.id),
+            )
+            logger.info(
+                "continue_crawl_job_enqueued",
+                crawl_id=str(crawl.id),
+                parent_crawl_id=str(parent_crawl_id),
+            )
+        except Exception as e:
+            logger.error("continue_crawl_enqueue_failed", crawl_id=str(crawl.id), error=str(e))
             await self._repo.update_status(crawl.id, "failed")
             await self._session.commit()
             raise

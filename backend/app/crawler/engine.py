@@ -28,7 +28,7 @@ logger = structlog.get_logger(__name__)
 _MAX_BODY_SIZE = 10 * 1024 * 1024
 
 # Consecutive domain failures before aborting
-_MAX_CONSECUTIVE_FAILURES = 10
+_MAX_CONSECUTIVE_FAILURES = 50
 
 # Progress publish interval
 _PROGRESS_INTERVAL_URLS = 10
@@ -54,6 +54,7 @@ class CrawlConfig:
     mode: str = "spider"
     urls: list[str] = field(default_factory=list)
     extraction_rules: list[dict] = field(default_factory=list)
+    parent_crawl_id: str | None = None
 
 
 @dataclass
@@ -185,6 +186,9 @@ class CrawlEngine:
                             await self._frontier.add(norm, depth=0)
                     # Override max_depth to 0 so we don't follow outlinks
                     self._config.max_depth = 0
+                elif self._config.parent_crawl_id:
+                    # Continue-crawl mode: seed from parent's uncrawled links
+                    await self._seed_from_parent(self._config.parent_crawl_id)
                 else:
                     # Spider mode: seed single start URL
                     await self._frontier.add(normalized_start, depth=0)
@@ -249,6 +253,72 @@ class CrawlEngine:
         return self._stats
 
     # ------------------------------------------------------------------
+    # Continue-crawl: seed from parent
+    # ------------------------------------------------------------------
+
+    async def _seed_from_parent(self, parent_crawl_id: str) -> None:
+        """Pre-populate Bloom filter with parent's crawled URLs and seed
+        the frontier with the parent's uncrawled internal links."""
+        from app.crawler.utils import url_hash_hex
+
+        parent_uuid = uuid.UUID(parent_crawl_id)
+        crawl_id_str = str(self._crawl_id)
+
+        async with self._pool.acquire() as conn:
+            # 1. Get all url_hash values from parent's crawled_urls
+            rows = await conn.fetch(
+                "SELECT url_hash FROM crawled_urls WHERE crawl_id = $1",
+                parent_uuid,
+            )
+            hex_hashes = [r["url_hash"].hex() for r in rows]
+
+            if hex_hashes:
+                populated = self._frontier.pre_populate_bloom(hex_hashes)
+                logger.info(
+                    "continue_crawl_bloom_populated",
+                    crawl_id=crawl_id_str,
+                    parent_crawl_id=parent_crawl_id,
+                    hashes_added=populated,
+                )
+
+            # 2. Get uncrawled internal links from parent's page_links
+            seed_rows = await conn.fetch(
+                """
+                SELECT DISTINCT pl.target_url
+                FROM page_links pl
+                WHERE pl.crawl_id = $1
+                  AND pl.link_type = 'internal'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM crawled_urls cu
+                    WHERE cu.crawl_id = $1
+                      AND cu.url_hash = pl.target_url_hash
+                  )
+                """,
+                parent_uuid,
+            )
+
+            seed_count = 0
+            for row in seed_rows:
+                added = await self._frontier.add(row["target_url"], depth=0)
+                if added:
+                    seed_count += 1
+
+            logger.info(
+                "continue_crawl_seeded",
+                crawl_id=crawl_id_str,
+                parent_crawl_id=parent_crawl_id,
+                uncrawled_links=len(seed_rows),
+                seeds_added=seed_count,
+            )
+
+            if seed_count == 0:
+                logger.warning(
+                    "continue_crawl_no_seeds",
+                    crawl_id=crawl_id_str,
+                    parent_crawl_id=parent_crawl_id,
+                )
+
+    # ------------------------------------------------------------------
     # Main BFS crawl loop
     # ------------------------------------------------------------------
 
@@ -268,8 +338,8 @@ class CrawlEngine:
                 await self._publish_progress(force=True)
                 continue
 
-            # Check max_urls limit
-            if self._stats.crawled_count >= self._config.max_urls:
+            # Check max_urls limit (0 = unlimited)
+            if self._config.max_urls > 0 and self._stats.crawled_count >= self._config.max_urls:
                 logger.info(
                     "crawl_max_urls_reached", crawl_id=crawl_id_str, limit=self._config.max_urls
                 )

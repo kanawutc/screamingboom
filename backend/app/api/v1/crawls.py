@@ -9,7 +9,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 
 from app.api.deps import DbSession, RedisClient
-from app.schemas.crawl import CrawlCreate, CrawlResponse, CrawlSummary
+from app.schemas.crawl import CrawlContinue, CrawlCreate, CrawlResponse, CrawlSummary
 from app.schemas.pagination import CursorPage
 from app.services.crawl_service import CrawlService
 from app.websocket.manager import get_broadcaster
@@ -102,6 +102,30 @@ async def get_crawl(
     crawl = await svc.get_crawl(crawl_id)
     if crawl is None:
         raise HTTPException(status_code=404, detail="Crawl not found")
+    return CrawlResponse.model_validate(crawl)
+
+
+@router.post(
+    "/crawls/{crawl_id}/continue",
+    response_model=CrawlResponse,
+    status_code=201,
+)
+async def continue_crawl(
+    crawl_id: uuid.UUID,
+    data: CrawlContinue,
+    db: DbSession,
+    redis: RedisClient,
+) -> CrawlResponse:
+    """Continue a completed/failed crawl by seeding from its uncrawled links."""
+    svc = CrawlService(db, redis)
+    try:
+        crawl = await svc.continue_crawl(crawl_id, data)
+    except ValueError as e:
+        msg = str(e)
+        if "not found" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        # "still running" → 409
+        raise HTTPException(status_code=409, detail=msg)
     return CrawlResponse.model_validate(crawl)
 
 

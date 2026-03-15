@@ -32,7 +32,7 @@ class URLFrontier:
 
         # In-memory Bloom filter — not persisted (Sprint 1)
         self._bloom = ScalableBloomFilter(
-            initial_capacity=100_000,
+            initial_capacity=1_000_000,
             error_rate=0.001,
         )
 
@@ -54,6 +54,23 @@ class URLFrontier:
         return f"crawl:{self._crawl_id}:domain_cooldown:{domain}"
 
     # ------------------------------------------------------------------
+    # Bloom filter pre-population (for continue-crawl)
+    # ------------------------------------------------------------------
+
+    def pre_populate_bloom(self, url_hex_hashes: list[str]) -> int:
+        """Add URL hashes to the Bloom filter without incrementing the added counter.
+
+        Used by continue-crawl to mark already-crawled URLs as "seen" so they
+        are never re-added to the frontier.  Returns the number of hashes added.
+        """
+        count = 0
+        for h in url_hex_hashes:
+            if h not in self._bloom:
+                self._bloom.add(h)
+                count += 1
+        return count
+
+    # ------------------------------------------------------------------
     # Core frontier operations
     # ------------------------------------------------------------------
 
@@ -72,7 +89,7 @@ class URLFrontier:
         if normalized is None:
             return False
 
-        if self._urls_added >= self._max_urls:
+        if self._max_urls > 0 and self._urls_added >= self._max_urls:
             return False
 
         # Bloom filter check
@@ -107,7 +124,7 @@ class URLFrontier:
         to_add: dict[str, float] = {}
 
         for raw_url, depth in urls_with_depths:
-            if self._urls_added + len(to_add) >= self._max_urls:
+            if self._max_urls > 0 and self._urls_added + len(to_add) >= self._max_urls:
                 break
 
             normalized = normalize_url(raw_url, base_url)

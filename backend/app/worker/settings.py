@@ -1,7 +1,7 @@
 """ARQ worker settings.
 
 CRITICAL CONFIGURATION (from Metis research):
-- job_timeout=7200: Long crawls can take hours. Default 300s kills them silently.
+- job_timeout=None: No timeout — crawls run indefinitely (24/7 operation).
 - max_tries=1: Crawls are NOT idempotent — retrying corrupts data.
 - health_check_interval=30: Detect dead workers within ~1 minute.
 - max_jobs=1: One crawl at a time per worker process.
@@ -77,7 +77,7 @@ class WorkerSettings:
     functions = [start_crawl_job]
 
     # CRITICAL: these values are non-negotiable (see module docstring)
-    job_timeout = 7200  # 2 hours max per crawl
+    job_timeout = None  # None = no timeout (24/7 crawling)
     max_tries = 1  # Crawls are NOT idempotent
     health_check_interval = 30  # Detect dead workers in <1 minute
     max_jobs = 1  # One crawl at a time per worker

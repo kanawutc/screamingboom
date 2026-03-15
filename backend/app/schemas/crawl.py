@@ -31,7 +31,7 @@ class CrawlMode(StrEnum):
 class CrawlConfig(BaseModel):
     """Configuration for a crawl session."""
 
-    max_urls: int = Field(default=10000, ge=1, le=1000000)
+    max_urls: int = Field(default=10000, ge=0, le=100_000_000)  # 0 = unlimited
     max_depth: int = Field(default=10, ge=1, le=100)
     max_threads: int = Field(default=5, ge=1, le=50)
     rate_limit_rps: float = Field(default=2.0, gt=0, le=100.0)
@@ -81,6 +81,12 @@ class CrawlResponse(BaseModel):
     crawled_urls_count: int
     error_count: int
     created_at: datetime
+
+
+class CrawlContinue(BaseModel):
+    """Schema for continuing an existing crawl from uncrawled links."""
+
+    additional_urls: int = Field(default=0, ge=0, le=100_000_000)  # 0 = unlimited
 
 
 class CrawlSummary(BaseModel):

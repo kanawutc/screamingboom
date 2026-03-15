@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
-    # Crawl defaults
+    # Crawl defaults (0 = unlimited)
     max_crawl_urls: int = 10000
     max_crawl_depth: int = 10
     max_threads: int = 5

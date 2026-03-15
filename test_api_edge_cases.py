@@ -135,7 +135,7 @@ def main():
                 end="",
                 flush=True,
             )
-            status = wait_for_crawl(crawl_id, max_wait=120)
+            status = wait_for_crawl(crawl_id, max_wait=180)
             print()
             check("setup: crawl completed", status == "completed", f"got: {status}")
 
@@ -194,12 +194,17 @@ def main():
             )
             check("POST crawl max_urls=-1 → 422", code == 422, f"code={code}")
 
-            code, _ = api_call(
+            # max_urls=0 is now valid (means "unlimited")
+            code, resp = api_call(
                 "POST",
                 f"/projects/{project_id}/crawls",
                 {"start_url": CRAWL_TARGET, "config": {"max_urls": 0}},
             )
-            check("POST crawl max_urls=0 → 422", code == 422, f"code={code}")
+            check("POST crawl max_urls=0 → 201 (unlimited)", code == 201, f"code={code}")
+            # Clean up the unlimited crawl immediately
+            if code == 201 and isinstance(resp, dict) and resp.get("id"):
+                api_call("POST", f"/crawls/{resp['id']}/stop")
+                api_call("DELETE", f"/crawls/{resp['id']}")
 
         code, _ = api_call(
             "POST", f"/projects/{fake_uuid}/crawls", {"start_url": CRAWL_TARGET}
@@ -348,7 +353,7 @@ def main():
             if code == 201 and isinstance(body, dict):
                 bad_crawl_id = body["id"]
                 check("start crawl with unreachable URL → 201", True)
-                status = wait_for_crawl(bad_crawl_id, max_wait=60)
+                status = wait_for_crawl(bad_crawl_id, max_wait=90)
                 check(
                     "unreachable crawl finishes gracefully",
                     status in ("completed", "failed"),
