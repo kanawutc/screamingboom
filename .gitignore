@@ -1,3 +1,67 @@
+# Environment
 .env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Ruff / Linters
+.ruff_cache/
+.mypy_cache/
+.pylint.d/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
 monitor.log
 monitor.log.*
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.next/
+frontend/build/
+
+# Docker
+*.pid
+
+# Database
+*.db
+*.sqlite3
+
+# Images (screenshots, etc.)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
