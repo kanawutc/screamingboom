@@ -47,8 +47,18 @@ class UrlRepository:
         if status_code_max is not None:
             query = query.where(CrawledUrl.status_code <= status_code_max)
         if content_type is not None:
-            safe_ct = content_type.replace("%", "\\%").replace("_", "\\_")
-            query = query.where(CrawledUrl.content_type.ilike(f"%{safe_ct}%"))
+            if content_type == "other":
+                # "Other" means NOT html, javascript, css, or image
+                query = query.where(
+                    ~CrawledUrl.content_type.ilike("%text/html%"),
+                    ~CrawledUrl.content_type.ilike("%javascript%"),
+                    ~CrawledUrl.content_type.ilike("%css%"),
+                    ~CrawledUrl.content_type.ilike("%image/%"),
+                    CrawledUrl.content_type.isnot(None),
+                )
+            else:
+                safe_ct = content_type.replace("%", "\\%").replace("_", "\\_")
+                query = query.where(CrawledUrl.content_type.ilike(f"%{safe_ct}%"))
         if is_indexable is not None:
             query = query.where(CrawledUrl.is_indexable == is_indexable)
         if search is not None and search.strip():

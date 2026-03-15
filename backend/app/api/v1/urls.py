@@ -253,40 +253,39 @@ async def export_crawl_xlsx(
 
     repo = UrlRepository(db)
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Crawl Data"
+    wb = Workbook(write_only=True)
+    ws = wb.create_sheet("Crawl Data")
 
     header_font = Font(bold=True, color="FFFFFF", size=10)
     header_fill = PatternFill(start_color="6CC04A", end_color="6CC04A", fill_type="solid")
     header_alignment = Alignment(horizontal="center", vertical="center")
 
-    for col_idx, col_name in enumerate(EXPORT_COLUMNS, 1):
-        cell = ws.cell(row=1, column=col_idx, value=col_name.replace("_", " ").title())
+    from openpyxl.cell import WriteOnlyCell
+    header_cells = []
+    for col_name in EXPORT_COLUMNS:
+        cell = WriteOnlyCell(ws, value=col_name.replace("_", " ").title())
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = header_alignment
+        header_cells.append(cell)
+    ws.append(header_cells)
+
+    # Set column widths based on header lengths
+    for col_idx, col_name in enumerate(EXPORT_COLUMNS, 1):
+        col_letter = get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = min(len(col_name) + 4, 40)
 
     row_num = 2
     async for batch in repo.stream_for_export(crawl_id=crawl_id, batch_size=500):
         for u in batch:
-            for col_idx, col in enumerate(EXPORT_COLUMNS, 1):
+            row_data = []
+            for col in EXPORT_COLUMNS:
                 val = getattr(u, col, None)
                 if isinstance(val, list):
                     val = " | ".join(str(v) for v in val)
-                ws.cell(row=row_num, column=col_idx, value=val if val is not None else "")
+                row_data.append(val if val is not None else "")
+            ws.append(row_data)
             row_num += 1
-
-    for col_idx in range(1, len(EXPORT_COLUMNS) + 1):
-        col_letter = get_column_letter(col_idx)
-        max_width = len(str(ws.cell(row=1, column=col_idx).value or ""))
-        for row in range(2, min(row_num, 52)):
-            cell_val = ws.cell(row=row, column=col_idx).value
-            if cell_val:
-                max_width = max(max_width, min(len(str(cell_val)), 60))
-        ws.column_dimensions[col_letter].width = max_width + 2
-
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(EXPORT_COLUMNS))}{row_num - 1}"
 
     buf = io.BytesIO()
     wb.save(buf)

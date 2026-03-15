@@ -1,0 +1,24 @@
+{
+  "name": "screaming-frog-clone",
+  "version": "1.0.0",
+  "description": "A self-hosted, open-source SEO crawling and analysis tool modeled after Screaming Frog SEO Spider. Crawls websites, detects SEO issues, and provides real-time progress monitoring via WebSocket.",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx playwright test tests/uat/comprehensive.spec.ts",
+    "test:headed": "npx playwright test tests/uat/comprehensive.spec.ts --headed"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kanawutc/screamingboom.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kanawutc/screamingboom/issues"
+  },
+  "homepage": "https://github.com/kanawutc/screamingboom#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  }
+}

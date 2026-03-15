@@ -160,10 +160,19 @@ class CrawlService:
         crawl = await self._repo.get_by_id(crawl_id)
         if crawl is None:
             return False
-        # If crawl is running, stop it first
-        if crawl.status in ("crawling", "paused"):
+        # If crawl is active, stop it first and wait briefly for worker to settle
+        if crawl.status in ("crawling", "paused", "queued", "completing"):
             channel = f"crawl:{crawl_id}:control"
             await self._redis.publish(channel, "stop")
+            await self._repo.update_status(crawl_id, "cancelled")
+            await self._session.commit()
+            # Give worker time to finish in-flight DB writes before cascade delete
+            import asyncio
+            await asyncio.sleep(2)
+            # Re-fetch to get fresh state
+            crawl = await self._repo.get_by_id(crawl_id)
+            if crawl is None:
+                return False
         await self._repo.delete_crawl(crawl)
         await self._session.commit()
         logger.info("crawl_deleted", crawl_id=str(crawl_id))

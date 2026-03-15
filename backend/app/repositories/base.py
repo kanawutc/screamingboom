@@ -27,8 +27,9 @@ class BaseRepository(Generic[ModelT]):
         limit: int = 50,
         base_query: Select | None = None,
     ) -> dict[str, Any]:
-        """Keyset pagination: WHERE id > cursor ORDER BY id LIMIT N+1.
+        """Keyset pagination ordered by created_at DESC (newest first).
 
+        Uses cursor based on id for stable page boundaries.
         Returns dict with keys: items, next_cursor, matching CursorPage shape.
         """
         if base_query is None:
@@ -42,7 +43,11 @@ class BaseRepository(Generic[ModelT]):
                 return {"items": [], "next_cursor": None}
             base_query = base_query.where(self._model.id > cursor_uuid)  # type: ignore[attr-defined]
 
-        base_query = base_query.order_by(self._model.id)  # type: ignore[attr-defined]
+        # Order by created_at DESC so newest items appear first
+        if hasattr(self._model, "created_at"):
+            base_query = base_query.order_by(self._model.created_at.desc(), self._model.id)  # type: ignore[attr-defined]
+        else:
+            base_query = base_query.order_by(self._model.id)  # type: ignore[attr-defined]
         base_query = base_query.limit(limit + 1)
 
         result = await self._session.execute(base_query)
