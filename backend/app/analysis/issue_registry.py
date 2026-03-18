@@ -26,6 +26,7 @@ class Category(str, Enum):
     security = "security"
     links = "links"
     indexability = "indexability"
+    pagination = "pagination"
 
 
 @dataclass(frozen=True)
@@ -260,4 +261,50 @@ _register(
     Severity.critical,
     Category.indexability,
     "Non-indexable: server error (5xx)",
+)
+
+# ---------------------------------------------------------------------------
+# Pagination (rel="next" / rel="prev")
+# ---------------------------------------------------------------------------
+_register(
+    "pagination_url_not_in_anchor",
+    Severity.warning,
+    Category.pagination,
+    "Pagination URL not found as an anchor link on the page",
+)
+_register(
+    "multiple_pagination_urls",
+    Severity.warning,
+    Category.pagination,
+    "Page has more than one rel=next or rel=prev attribute",
+)
+_register(
+    "non_indexable_paginated",
+    Severity.warning,
+    Category.pagination,
+    "Paginated URL is non-indexable",
+)
+_register(
+    "non_200_pagination_url",
+    Severity.critical,
+    Category.pagination,
+    "Pagination URL does not return 200 status code",
+)
+_register(
+    "unlinked_pagination_url",
+    Severity.warning,
+    Category.pagination,
+    "Pagination URL is not linked to across the website",
+)
+_register(
+    "pagination_loop",
+    Severity.warning,
+    Category.pagination,
+    "Pagination attributes form a loop back to a previously visited URL",
+)
+_register(
+    "pagination_sequence_error",
+    Severity.warning,
+    Category.pagination,
+    "Pagination rel=next/prev sequence does not reciprocate correctly",
 )

@@ -17,6 +17,7 @@ import type {
   IssueFilterParams,
   IssueSummary,
   PageLink,
+  PaginationItem,
   Project,
   ProjectCreate,
   ProjectUpdate,
@@ -195,6 +196,11 @@ export const urlsApi = {
   customExtractions: (crawlId: string, cursor?: string | null, limit = 50) =>
     request<{ items: CustomExtractionItem[]; next_cursor: string | null }>(
       `/crawls/${crawlId}/custom-extractions${qs({ cursor, limit })}`
+    ),
+
+  pagination: (crawlId: string, filter?: string | null, cursor?: string | null, limit = 50) =>
+    request<{ items: PaginationItem[]; next_cursor: string | null }>(
+      `/crawls/${crawlId}/pagination${qs({ filter, cursor, limit })}`
     ),
 };
 

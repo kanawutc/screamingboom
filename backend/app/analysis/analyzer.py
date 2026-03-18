@@ -77,6 +77,7 @@ class CrawlAnalyzer:
         from app.analysis.rules.directives import analyze_directives
         from app.analysis.rules.url_quality import analyze_url_quality
         from app.analysis.rules.security import analyze_security
+        from app.analysis.rules.pagination import analyze_pagination
 
         # Only run content analyzers on HTML pages with page_data
         is_html = page_data.title is not None or page_data.word_count > 0
@@ -92,6 +93,10 @@ class CrawlAnalyzer:
         # URL quality and security run for ALL URLs (not just HTML)
         issues.extend(analyze_url_quality(self._crawl_id, url_id, url))
         issues.extend(analyze_security(self._crawl_id, url_id, page_data, fetch_result, url))
+
+        # Pagination analysis (runs for HTML pages with pagination data)
+        if is_html and page_data.pagination:
+            issues.extend(analyze_pagination(self._crawl_id, url_id, page_data))
 
         return issues
 

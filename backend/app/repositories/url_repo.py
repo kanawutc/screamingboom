@@ -550,3 +550,80 @@ class UrlRepository:
             "urls": urls,
             "total_count": filtered_total,
         }
+
+    async def list_pagination_urls(
+        self,
+        crawl_id: uuid.UUID,
+        filter_type: str | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """List URLs with pagination attributes (rel=next/prev).
+
+        Filter types:
+        - contains: has any pagination attribute
+        - first_page: has rel_next but no rel_prev
+        - paginated_2_plus: has rel_prev
+        - url_not_in_anchor: issue filter
+        - non_200: issue filter
+        - unlinked: issue filter
+        - non_indexable: issue filter
+        - multiple: issue filter
+        - loop: issue filter
+        - sequence_error: issue filter
+        """
+        # Issue-based filters map to specific issue types
+        _issue_filters = {
+            "url_not_in_anchor": "pagination_url_not_in_anchor",
+            "non_200": "non_200_pagination_url",
+            "unlinked": "unlinked_pagination_url",
+            "non_indexable": "non_indexable_paginated",
+            "multiple": "multiple_pagination_urls",
+            "loop": "pagination_loop",
+            "sequence_error": "pagination_sequence_error",
+        }
+
+        query = select(CrawledUrl).where(
+            CrawledUrl.crawl_id == crawl_id,
+            text("seo_data ? 'pagination'"),
+        )
+
+        if filter_type == "first_page":
+            query = query.where(
+                text("seo_data->'pagination'->>'rel_next' IS NOT NULL"),
+                text("(seo_data->'pagination'->>'rel_prev' IS NULL)"),
+            )
+        elif filter_type == "paginated_2_plus":
+            query = query.where(
+                text("seo_data->'pagination'->>'rel_prev' IS NOT NULL"),
+            )
+        elif filter_type in _issue_filters:
+            issue_type = _issue_filters[filter_type]
+            issue_subquery = (
+                select(UrlIssue.url_id)
+                .where(
+                    UrlIssue.crawl_id == crawl_id,
+                    UrlIssue.issue_type == issue_type,
+                )
+                .distinct()
+                .scalar_subquery()
+            )
+            query = query.where(CrawledUrl.id.in_(issue_subquery))
+
+        if cursor:
+            try:
+                cursor_uuid = uuid.UUID(cursor)
+            except (ValueError, AttributeError):
+                return {"items": [], "next_cursor": None}
+            query = query.where(CrawledUrl.id > cursor_uuid)
+
+        query = query.order_by(CrawledUrl.id).limit(limit + 1)
+
+        result = await self._session.execute(query)
+        items = list(result.scalars().all())
+
+        has_more = len(items) > limit
+        page_items = items[:limit]
+        next_cursor = str(page_items[-1].id) if has_more and page_items else None
+
+        return {"items": page_items, "next_cursor": next_cursor}

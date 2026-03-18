@@ -275,7 +275,17 @@ export interface ExtractionRuleUpdate {
 export interface CustomExtractionItem {
   url_id: string;
   url: string;
-  extractions: Record<string, string | number | null>;
+  extractions: Record<string, string | number | boolean | null>;
+}
+
+export interface PaginationItem {
+  url_id: string;
+  url: string;
+  status_code: number | null;
+  rel_next: string | null;
+  rel_prev: string | null;
+  is_indexable: boolean;
+  indexability_reason: string | null;
 }
 
 // ─── Crawl Comparison ────────────────────────────────────────────────

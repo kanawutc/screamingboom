@@ -467,6 +467,12 @@ class CrawlEngine:
                     self._crawl_id, result.redirect_chain, final_url=result.final_url
                 )
 
+            # Add pagination rel=next/prev URLs to frontier for crawling
+            if page_data and page_data.pagination:
+                for pag_url in [page_data.pagination.rel_next, page_data.pagination.rel_prev]:
+                    if pag_url and self._is_in_scope(pag_url):
+                        await self._frontier.add(pag_url, depth=depth + 1)
+
             # Update stats
             self._stats.crawled_count += 1
 

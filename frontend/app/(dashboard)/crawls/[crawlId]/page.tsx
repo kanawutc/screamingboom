@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/crawl/StatusBadge";
 import { crawlsApi, urlsApi, issuesApi } from "@/lib/api-client";
 import { useCrawlWebSocket } from "@/hooks/use-crawl-websocket";
 import { useCrawlStore } from "@/stores/crawl-store";
-import type { Crawl, CrawledUrl, CrawlStatus, Issue, IssueSeverity, CrawledUrlDetail, PageLink, ExternalLink as ExternalLinkData, StructuredDataItem, CustomExtractionItem } from "@/types";
+import type { Crawl, CrawledUrl, CrawlStatus, Issue, IssueSeverity, CrawledUrlDetail, PageLink, ExternalLink as ExternalLinkData, StructuredDataItem, CustomExtractionItem, PaginationItem } from "@/types";
 import {
   Pause, Play, Square, Trash2, ArrowLeft, ExternalLink as ExternalLinkIcon, Globe,
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
@@ -32,7 +32,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "internal" | "external" | "response_codes" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "issues";
+type TabKey = "internal" | "external" | "response_codes" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -49,6 +49,7 @@ const TABS: TabDef[] = [
   { key: "directives", label: "Directives", icon: <Shield className="h-3 w-3" /> },
   { key: "structured_data", label: "Structured Data", icon: <FileCode2 className="h-3 w-3" /> },
   { key: "custom_extraction", label: "Custom Extraction", icon: <Braces className="h-3 w-3" /> },
+  { key: "pagination", label: "Pagination", icon: <Navigation className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -130,6 +131,18 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   custom_extraction: [
     { label: "All", filter: {} },
   ],
+  pagination: [
+    { label: "Contains Pagination", filter: { pagination_filter: "contains" } },
+    { label: "First Page", filter: { pagination_filter: "first_page" } },
+    { label: "Paginated 2+", filter: { pagination_filter: "paginated_2_plus" } },
+    { label: "URL Not In Anchor", filter: { pagination_filter: "url_not_in_anchor" } },
+    { label: "Non-200", filter: { pagination_filter: "non_200" } },
+    { label: "Unlinked", filter: { pagination_filter: "unlinked" } },
+    { label: "Non-Indexable", filter: { pagination_filter: "non_indexable" } },
+    { label: "Multiple", filter: { pagination_filter: "multiple" } },
+    { label: "Loop", filter: { pagination_filter: "loop" } },
+    { label: "Sequence Error", filter: { pagination_filter: "sequence_error" } },
+  ],
   issues: [
     { label: "All", filter: {} },
     { label: "Critical", filter: { severity: "critical" } },
@@ -168,6 +181,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
   const [extCursor, setExtCursor] = useState<string | null>(null);
   const [sdCursor, setSdCursor] = useState<string | null>(null);
   const [ceCursor, setCeCursor] = useState<string | null>(null);
+  const [pagCursor, setPagCursor] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
   const [searchInput, setSearchInput] = useState("");
 
@@ -190,8 +204,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
   useCrawlWebSocket(crawlId, { enabled: wsEnabled });
 
   useEffect(() => { if (liveStatus && !isActive(liveStatus)) refetchCrawl(); }, [liveStatus, refetchCrawl]);
-  useEffect(() => { setUrlCursor(null); setExtCursor(null); setSdCursor(null); setCeCursor(null); setActiveSubFilter(0); setSearchText(""); setSearchInput(""); }, [activeTab]);
-  useEffect(() => { setUrlCursor(null); setIssueCursor(null); setExtCursor(null); setSdCursor(null); setCeCursor(null); }, [activeSubFilter]);
+  useEffect(() => { setUrlCursor(null); setExtCursor(null); setSdCursor(null); setCeCursor(null); setPagCursor(null); setActiveSubFilter(0); setSearchText(""); setSearchInput(""); }, [activeTab]);
+  useEffect(() => { setUrlCursor(null); setIssueCursor(null); setExtCursor(null); setSdCursor(null); setCeCursor(null); setPagCursor(null); }, [activeSubFilter]);
 
   const currentSubFilters = SUB_FILTERS[activeTab];
   const currentFilter = currentSubFilters[activeSubFilter]?.filter ?? {};
@@ -222,7 +236,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction",
+    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -248,6 +262,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-custom-extractions", crawlId, ceCursor],
     queryFn: () => urlsApi.customExtractions(crawlId, ceCursor, 50),
     enabled: !!crawl && activeTab === "custom_extraction",
+  });
+
+  const pagFilterVal = (currentFilter as Record<string, string>).pagination_filter as string | undefined;
+  const { data: pagData, isLoading: pagLoading } = useQuery({
+    queryKey: ["crawl-pagination", crawlId, pagCursor, pagFilterVal, activeSubFilter],
+    queryFn: () => urlsApi.pagination(crawlId, pagFilterVal ?? "contains", pagCursor, 100),
+    enabled: !!crawl && activeTab === "pagination",
   });
 
   const { data: issuesData, isLoading: issuesLoading } = useQuery({
@@ -280,6 +301,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
   const sdNextCursor = sdData?.next_cursor ?? null;
   const ceItems = ceData?.items ?? [];
   const ceNextCursor = ceData?.next_cursor ?? null;
+  const pagItems = pagData?.items ?? [];
+  const pagNextCursor = pagData?.next_cursor ?? null;
 
   const crawledCount = progress?.crawled_count ?? crawl?.crawled_urls_count ?? 0;
   const errorCount = progress?.error_count ?? crawl?.error_count ?? 0;
@@ -461,6 +484,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <StructuredDataTable items={sdItems} loading={sdLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             ) : activeTab === "custom_extraction" ? (
               <CustomExtractionTable items={ceItems} loading={ceLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
+            ) : activeTab === "pagination" ? (
+              <PaginationAuditTable items={pagItems} loading={pagLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -498,6 +523,14 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
                 <div className="flex gap-2">
                   <button onClick={() => setCeCursor(null)} disabled={!ceCursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">First</button>
                   <button onClick={() => setCeCursor(ceNextCursor)} disabled={!ceNextCursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
+                </div>
+              </>
+            ) : activeTab === "pagination" ? (
+              <>
+                <span>Showing {pagItems.length} pages with pagination</span>
+                <div className="flex gap-2">
+                  <button onClick={() => setPagCursor(null)} disabled={!pagCursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">First</button>
+                  <button onClick={() => setPagCursor(pagNextCursor)} disabled={!pagNextCursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
                 </div>
               </>
             ) : (
@@ -816,6 +849,74 @@ function CustomExtractionTable({ items, loading, crawlActive }: {
                 </td>
               );
             })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function PaginationAuditTable({ items, loading, crawlActive }: {
+  items: PaginationItem[]; loading: boolean; crawlActive: boolean;
+}) {
+  if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Loading pagination data...</div>;
+  if (items.length === 0) return (
+    <div className="flex flex-col items-center justify-center h-32 text-xs text-gray-400 gap-1">
+      {crawlActive ? "Crawl in progress — pagination data will appear shortly..." : (
+        <>
+          <span>No pagination data found.</span>
+          <span className="text-[10px]">Pages with rel=&quot;next&quot; or rel=&quot;prev&quot; attributes will appear here.</span>
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <table className="sf-table w-full">
+      <thead>
+        <tr>
+          <th style={{ width: "30%" }}>URL</th>
+          <th style={{ width: "7%" }}>Status</th>
+          <th style={{ width: "25%" }}>rel=&quot;next&quot;</th>
+          <th style={{ width: "25%" }}>rel=&quot;prev&quot;</th>
+          <th style={{ width: "13%" }}>Indexable</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((item) => (
+          <tr key={item.url_id}>
+            <td>
+              <div className="flex items-center gap-1">
+                <span className="truncate" title={item.url}>{truncateUrl(item.url, 50)}</span>
+                <a href={item.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 text-gray-300 hover:text-gray-600" onClick={(e) => e.stopPropagation()}>
+                  <ExternalLinkIcon className="h-2.5 w-2.5" />
+                </a>
+              </div>
+            </td>
+            <td>
+              <span className={statusCodeColor(item.status_code)}>{item.status_code ?? "—"}</span>
+            </td>
+            <td>
+              {item.rel_next ? (
+                <span className="truncate block max-w-[260px]" title={item.rel_next}>{item.rel_next}</span>
+              ) : (
+                <span className="text-gray-300">—</span>
+              )}
+            </td>
+            <td>
+              {item.rel_prev ? (
+                <span className="truncate block max-w-[260px]" title={item.rel_prev}>{item.rel_prev}</span>
+              ) : (
+                <span className="text-gray-300">—</span>
+              )}
+            </td>
+            <td>
+              {item.is_indexable ? (
+                <span className="text-green-700 text-[10px] font-medium">Yes</span>
+              ) : (
+                <span className="text-orange-600 text-[10px] font-medium" title={item.indexability_reason ?? undefined}>No{item.indexability_reason ? ` (${item.indexability_reason})` : ""}</span>
+              )}
+            </td>
           </tr>
         ))}
       </tbody>

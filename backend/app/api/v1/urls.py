@@ -416,3 +416,40 @@ async def list_custom_extractions(
         "items": items,
         "next_cursor": result["next_cursor"],
     }
+
+
+@router.get("/crawls/{crawl_id}/pagination")
+async def list_pagination_urls(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    filter: str | None = Query(None, description="Filter type: contains, first_page, paginated_2_plus, url_not_in_anchor, non_200, unlinked, non_indexable, multiple, loop, sequence_error"),
+    cursor: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+) -> dict:
+    """List URLs with pagination rel=next/prev attributes."""
+    repo = UrlRepository(db)
+    result = await repo.list_pagination_urls(
+        crawl_id=crawl_id,
+        filter_type=filter,
+        cursor=cursor,
+        limit=limit,
+    )
+    items = []
+    for url_obj in result["items"]:
+        seo_data = url_obj.seo_data or {}
+        pag = seo_data.get("pagination", {})
+        items.append(
+            {
+                "url_id": str(url_obj.id),
+                "url": url_obj.url,
+                "status_code": url_obj.status_code,
+                "rel_next": pag.get("rel_next"),
+                "rel_prev": pag.get("rel_prev"),
+                "is_indexable": url_obj.is_indexable,
+                "indexability_reason": url_obj.indexability_reason,
+            }
+        )
+    return {
+        "items": items,
+        "next_cursor": result["next_cursor"],
+    }

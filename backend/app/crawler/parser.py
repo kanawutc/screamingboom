@@ -54,6 +54,14 @@ class ImageData:
 
 
 @dataclass
+class PaginationData:
+    """Pagination rel=next/prev data."""
+
+    rel_next: str | None = None
+    rel_prev: str | None = None
+
+
+@dataclass
 class HreflangData:
     """An hreflang tag."""
 
@@ -90,6 +98,10 @@ class PageData:
     robots_meta_tag_count: int = 0
     heading_sequence: list[str] = field(default_factory=list)  # ["h1","h2","h2","h3",...]
     mixed_content_urls: list[str] = field(default_factory=list)
+
+    # Pagination attributes
+    pagination: PaginationData | None = None
+    pagination_count: dict = field(default_factory=dict)  # {"next": N, "prev": N}
 
     # Phase 3E: Custom extraction rules results
     custom_extractions: dict = field(default_factory=dict)
@@ -141,6 +153,7 @@ class ParserPool:
         self._extract_links(tree, data, base_url, base_domain)
         self._extract_images(tree, data, base_url)
         self._extract_hreflang(tree, data, base_url)
+        self._extract_pagination(tree, data, base_url)
         self._extract_structured_data(tree, data, base_url)
         self._extract_og_tags(tree, data)
 
@@ -384,6 +397,33 @@ class ParserPool:
                 resolved = normalize_url(href.strip(), base_url)
                 if resolved:
                     data.hreflang_tags.append(HreflangData(hreflang=hreflang, href=resolved))
+
+    def _extract_pagination(self, tree: HTMLParser, data: PageData, base_url: str) -> None:
+        """Extract <link rel="next"> and <link rel="prev"> pagination attributes."""
+        next_nodes = tree.css('link[rel="next"]')
+        prev_nodes = tree.css('link[rel="prev"]')
+
+        next_count = len(next_nodes)
+        prev_count = len(prev_nodes)
+
+        if next_count == 0 and prev_count == 0:
+            return
+
+        rel_next = None
+        rel_prev = None
+
+        if next_nodes:
+            href = next_nodes[0].attributes.get("href", "")
+            if href:
+                rel_next = normalize_url(href.strip(), base_url)
+
+        if prev_nodes:
+            href = prev_nodes[0].attributes.get("href", "")
+            if href:
+                rel_prev = normalize_url(href.strip(), base_url)
+
+        data.pagination = PaginationData(rel_next=rel_next, rel_prev=rel_prev)
+        data.pagination_count = {"next": next_count, "prev": prev_count}
 
     def _extract_structured_data(
         self, tree: HTMLParser, data: PageData, base_url: str = ""

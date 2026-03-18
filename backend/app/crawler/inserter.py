@@ -122,6 +122,15 @@ class BatchInserter:
         if page_data.custom_extractions:
             seo_data["custom_extractions"] = page_data.custom_extractions
 
+        # Pagination attributes (rel=next/prev)
+        if page_data.pagination:
+            seo_data["pagination"] = {
+                "rel_next": page_data.pagination.rel_next,
+                "rel_prev": page_data.pagination.rel_prev,
+                "next_count": page_data.pagination_count.get("next", 0),
+                "prev_count": page_data.pagination_count.get("prev", 0),
+            }
+
         # Sprint 2: Security headers from response
         # Lowercase keys for case-insensitive lookup (HTTP headers are case-insensitive per RFC 7230)
         headers = {k.lower(): v for k, v in (fetch_result.headers or {}).items()}
