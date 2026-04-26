@@ -960,6 +960,93 @@ class UrlRepository:
             "issue_counts": header_counts,
         }
 
+    async def get_performance_stats(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 100,
+    ) -> dict:
+        """Get performance analysis: response time stats, slow pages."""
+        stats_sql = text("""
+            SELECT
+                COUNT(*) AS total,
+                AVG(response_time_ms) AS avg_ms,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY response_time_ms) AS p50_ms,
+                PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY response_time_ms) AS p95_ms,
+                MIN(response_time_ms) AS min_ms,
+                MAX(response_time_ms) AS max_ms,
+                COUNT(*) FILTER (WHERE response_time_ms > 1000) AS slow_count,
+                COUNT(*) FILTER (WHERE response_time_ms > 3000) AS very_slow_count
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND response_time_ms IS NOT NULL
+              AND status_code BETWEEN 200 AND 299
+        """)
+        stats_result = await self._session.execute(
+            stats_sql, {"crawl_id": str(crawl_id)}
+        )
+        row = stats_result.one()
+
+        # Distribution buckets
+        dist_sql = text("""
+            SELECT
+                CASE
+                    WHEN response_time_ms < 200 THEN '<200ms'
+                    WHEN response_time_ms < 500 THEN '200-500ms'
+                    WHEN response_time_ms < 1000 THEN '500ms-1s'
+                    WHEN response_time_ms < 3000 THEN '1-3s'
+                    ELSE '>3s'
+                END AS bucket,
+                COUNT(*) AS cnt
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND response_time_ms IS NOT NULL
+              AND status_code BETWEEN 200 AND 299
+            GROUP BY bucket
+            ORDER BY MIN(response_time_ms)
+        """)
+        dist_result = await self._session.execute(
+            dist_sql, {"crawl_id": str(crawl_id)}
+        )
+        distribution = [{"bucket": r.bucket, "count": r.cnt} for r in dist_result.all()]
+
+        # Slowest pages
+        slow_sql = text("""
+            SELECT id, url, response_time_ms, status_code, content_type
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND response_time_ms IS NOT NULL
+            ORDER BY response_time_ms DESC
+            LIMIT :limit
+        """)
+        slow_result = await self._session.execute(
+            slow_sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        slowest = [
+            {
+                "url_id": str(r.id),
+                "url": r.url,
+                "response_time_ms": r.response_time_ms,
+                "status_code": r.status_code,
+                "content_type": r.content_type,
+            }
+            for r in slow_result.all()
+        ]
+
+        return {
+            "stats": {
+                "total": row.total,
+                "avg_ms": round(row.avg_ms, 1) if row.avg_ms else None,
+                "p50_ms": round(row.p50_ms, 1) if row.p50_ms else None,
+                "p95_ms": round(row.p95_ms, 1) if row.p95_ms else None,
+                "min_ms": row.min_ms,
+                "max_ms": row.max_ms,
+                "slow_count": row.slow_count,
+                "very_slow_count": row.very_slow_count,
+            },
+            "distribution": distribution,
+            "slowest_pages": slowest,
+        }
+
     async def get_hreflang_data(
         self,
         crawl_id: uuid.UUID,

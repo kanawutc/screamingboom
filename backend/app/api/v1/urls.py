@@ -508,6 +508,17 @@ async def get_link_scores(
     return await repo.get_link_scores(crawl_id, limit=limit)
 
 
+@router.get("/crawls/{crawl_id}/performance")
+async def get_performance_stats(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(50, ge=1, le=500),
+) -> dict:
+    """Get response time statistics and slowest pages."""
+    repo = UrlRepository(db)
+    return await repo.get_performance_stats(crawl_id, limit=limit)
+
+
 @router.get("/crawls/{crawl_id}/cookies")
 async def get_cookies_audit(
     crawl_id: uuid.UUID,

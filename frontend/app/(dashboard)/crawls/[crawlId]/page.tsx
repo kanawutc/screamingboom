@@ -13,7 +13,7 @@ import {
   Pause, Play, Square, Trash2, ArrowLeft, ExternalLink as ExternalLinkIcon, Globe,
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
   X, Download, Search, Link2, Shield, Navigation, FileCode2, Sheet, Braces,
-  FastForward, Network, Copy, Cookie, Lock, Languages,
+  FastForward, Network, Copy, Cookie, Lock, Languages, Timer,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -33,7 +33,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "internal" | "external" | "response_codes" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "issues";
+type TabKey = "internal" | "external" | "response_codes" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -53,6 +53,7 @@ const TABS: TabDef[] = [
   { key: "pagination", label: "Pagination", icon: <Navigation className="h-3 w-3" /> },
   { key: "custom_search", label: "Custom Search", icon: <Search className="h-3 w-3" /> },
   { key: "content", label: "Content", icon: <FileText className="h-3 w-3" /> },
+  { key: "performance", label: "Performance", icon: <Timer className="h-3 w-3" /> },
   { key: "cookies", label: "Cookies", icon: <Cookie className="h-3 w-3" /> },
   { key: "security", label: "Security", icon: <Lock className="h-3 w-3" /> },
   { key: "hreflang", label: "Hreflang", icon: <Languages className="h-3 w-3" /> },
@@ -155,6 +156,9 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
     { label: "All", filter: {} },
   ],
   content: [
+    { label: "All", filter: {} },
+  ],
+  performance: [
     { label: "All", filter: {} },
   ],
   cookies: [
@@ -265,7 +269,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "links_analysis" && activeTab !== "duplicates",
+    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "links_analysis" && activeTab !== "duplicates",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -333,6 +337,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-content-analysis", crawlId],
     queryFn: () => urlsApi.contentAnalysis(crawlId),
     enabled: !!crawl && activeTab === "content" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: perfData, isLoading: perfLoading } = useQuery<any>({
+    queryKey: ["crawl-performance", crawlId],
+    queryFn: () => urlsApi.performance(crawlId),
+    enabled: !!crawl && activeTab === "performance" && isTerminal,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -574,6 +585,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <CustomSearchTable items={csItems} loading={csLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             ) : activeTab === "content" ? (
               <ContentAnalysisPanel data={contentAnalysisData} loading={contentLoading} isTerminal={isTerminal} />
+            ) : activeTab === "performance" ? (
+              <PerformancePanel data={perfData} loading={perfLoading} isTerminal={isTerminal} />
             ) : activeTab === "cookies" ? (
               <CookiesPanel data={cookiesData} loading={cookiesLoading} isTerminal={isTerminal} />
             ) : activeTab === "security" ? (
@@ -1535,6 +1548,92 @@ function ContentAnalysisPanel({ data, loading, isTerminal }: { data: any[] | und
     </div>
   );
 }
+function PerformancePanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Performance analysis available after crawl completes.</div>;
+  if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Analyzing performance...</div>;
+  if (!data) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">No performance data available.</div>;
+
+  const stats = data.stats ?? {};
+  const dist = data.distribution ?? [];
+  const slowest = data.slowest_pages ?? [];
+  const maxBucket = Math.max(...dist.map((d: any) => d.count), 1);
+
+  const speedColor = (ms: number | null) => {
+    if (ms == null) return "text-gray-400";
+    if (ms < 500) return "text-green-700";
+    if (ms < 1000) return "text-amber-600";
+    return "text-red-600";
+  };
+
+  return (
+    <div className="overflow-auto">
+      {/* Summary cards */}
+      <div className="flex gap-3 p-3 border-b border-gray-200">
+        <div className="flex-1 p-2 bg-blue-50 rounded border border-blue-200 text-center">
+          <div className="text-[10px] text-blue-500 uppercase tracking-wide">Avg Response</div>
+          <div className={`text-lg font-bold ${speedColor(stats.avg_ms)}`}>{stats.avg_ms != null ? `${stats.avg_ms}ms` : "—"}</div>
+        </div>
+        <div className="flex-1 p-2 bg-green-50 rounded border border-green-200 text-center">
+          <div className="text-[10px] text-green-500 uppercase tracking-wide">P50 (Median)</div>
+          <div className={`text-lg font-bold ${speedColor(stats.p50_ms)}`}>{stats.p50_ms != null ? `${stats.p50_ms}ms` : "—"}</div>
+        </div>
+        <div className="flex-1 p-2 bg-amber-50 rounded border border-amber-200 text-center">
+          <div className="text-[10px] text-amber-500 uppercase tracking-wide">P95</div>
+          <div className={`text-lg font-bold ${speedColor(stats.p95_ms)}`}>{stats.p95_ms != null ? `${stats.p95_ms}ms` : "—"}</div>
+        </div>
+        <div className="flex-1 p-2 bg-red-50 rounded border border-red-200 text-center">
+          <div className="text-[10px] text-red-500 uppercase tracking-wide">Slow ({">"}1s)</div>
+          <div className="text-lg font-bold text-red-700">{stats.slow_count ?? 0}</div>
+        </div>
+        <div className="flex-1 p-2 bg-purple-50 rounded border border-purple-200 text-center">
+          <div className="text-[10px] text-purple-500 uppercase tracking-wide">Pages</div>
+          <div className="text-lg font-bold text-purple-700">{stats.total ?? 0}</div>
+        </div>
+      </div>
+
+      {/* Distribution chart */}
+      {dist.length > 0 && (
+        <div className="p-3 border-b border-gray-200">
+          <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2">Response Time Distribution</h3>
+          <div className="space-y-1.5">
+            {dist.map((d: any, i: number) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-[10px] text-gray-500 w-20 text-right font-mono">{d.bucket}</span>
+                <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
+                  <div className={`h-full rounded ${d.bucket === ">3s" ? "bg-red-400" : d.bucket === "1-3s" ? "bg-amber-400" : d.bucket === "500ms-1s" ? "bg-yellow-400" : "bg-green-400"}`} style={{ width: `${(d.count / maxBucket) * 100}%` }} />
+                </div>
+                <span className="text-[10px] text-gray-600 w-10 font-mono">{d.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Slowest pages table */}
+      <table className="w-full text-[11px]">
+        <thead className="bg-gray-50 sticky top-0">
+          <tr className="text-left text-[10px] text-gray-500 uppercase tracking-wider">
+            <th className="px-3 py-1.5 font-medium">URL</th>
+            <th className="px-3 py-1.5 font-medium text-right w-28">Response Time</th>
+            <th className="px-3 py-1.5 font-medium text-right w-20">Status</th>
+            <th className="px-3 py-1.5 font-medium w-24">Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          {slowest.map((page: any, i: number) => (
+            <tr key={i} className={`border-t border-gray-100 hover:bg-blue-50/40 ${page.response_time_ms > 3000 ? "bg-red-50/30" : page.response_time_ms > 1000 ? "bg-amber-50/30" : ""}`}>
+              <td className="px-3 py-1.5 truncate max-w-[400px]" title={page.url}>{truncateUrl(page.url, 60)}</td>
+              <td className={`px-3 py-1.5 text-right font-mono font-medium ${speedColor(page.response_time_ms)}`}>{page.response_time_ms}ms</td>
+              <td className="px-3 py-1.5 text-right font-mono">{page.status_code}</td>
+              <td className="px-3 py-1.5 text-gray-500 truncate">{page.content_type?.split(";")[0] ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function CookiesPanel({ data, loading, isTerminal }: { data: any[] | undefined; loading: boolean; isTerminal: boolean }) {
   if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Cookie audit available after crawl completes.</div>;
   if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Auditing cookies...</div>;

@@ -225,6 +225,10 @@ export const urlsApi = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any[]>(`/crawls/${crawlId}/content-analysis${qs({ limit })}`),
 
+  performance: (crawlId: string, limit = 50) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/performance${qs({ limit })}`),
+
   cookiesAudit: (crawlId: string, limit = 200) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any[]>(`/crawls/${crawlId}/cookies${qs({ limit })}`),
