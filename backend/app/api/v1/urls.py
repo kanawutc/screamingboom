@@ -1374,3 +1374,14 @@ async def get_audit_report_html(
         media_type="text/html",
         headers={"Content-Disposition": f'inline; filename="seo-audit-{crawl_id}.html"'},
     )
+
+
+@router.get("/crawls/{crawl_id}/pdf-audit")
+async def get_pdf_audit(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(500, ge=1, le=2000),
+) -> dict:
+    """Get PDF audit: all PDF files found during crawl with metadata and issues."""
+    repo = UrlRepository(db)
+    return await repo.get_pdf_audit(crawl_id, limit=limit)

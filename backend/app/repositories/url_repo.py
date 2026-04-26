@@ -2633,3 +2633,114 @@ class UrlRepository:
             "type_distribution": [{"type": t, "count": c} for t, c in sorted_types],
             "pages": pages,
         }
+
+    async def get_pdf_audit(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 500,
+    ) -> dict[str, Any]:
+        """Get PDF audit data: all PDF URLs with metadata, linking pages, and issues."""
+        # Get all PDF URLs
+        result = await self._session.execute(
+            text("""
+                SELECT id, url, status_code, content_type,
+                       response_time_ms, crawl_depth,
+                       (seo_data->>'content_length')::bigint AS file_size_bytes,
+                       seo_data->>'pdf_title' AS pdf_title,
+                       title
+                FROM crawled_urls
+                WHERE crawl_id = :crawl_id
+                  AND (content_type LIKE '%%pdf%%' OR url LIKE '%%.pdf%%')
+                ORDER BY url
+                LIMIT :limit
+            """),
+            {"crawl_id": crawl_id, "limit": limit},
+        )
+        pdf_rows = result.mappings().all()
+
+        pdfs: list[dict] = []
+        pdf_url_ids = []
+        for row in pdf_rows:
+            file_size = row.get("file_size_bytes") or 0
+            pdfs.append({
+                "url_id": str(row["id"]),
+                "url": row["url"],
+                "status_code": row["status_code"],
+                "response_time_ms": row["response_time_ms"],
+                "crawl_depth": row["crawl_depth"],
+                "file_size_bytes": file_size,
+                "file_size_kb": round(file_size / 1024, 1) if file_size else 0,
+                "pdf_title": row.get("pdf_title") or row.get("title") or None,
+                "issues": [],
+                "inlinks": [],
+            })
+            pdf_url_ids.append(str(row["id"]))
+
+        # Get inlinks (pages that link to these PDFs)
+        if pdf_url_ids:
+            inlinks_result = await self._session.execute(
+                text("""
+                    SELECT pl.target_url, pl.source_url, pl.anchor_text
+                    FROM page_links pl
+                    WHERE pl.crawl_id = :crawl_id
+                      AND pl.target_url IN (
+                          SELECT url FROM crawled_urls
+                          WHERE crawl_id = :crawl_id
+                            AND (content_type LIKE '%%pdf%%' OR url LIKE '%%.pdf%%')
+                      )
+                    LIMIT 2000
+                """),
+                {"crawl_id": crawl_id},
+            )
+            inlink_rows = inlinks_result.mappings().all()
+
+            # Group by target_url
+            inlinks_by_url: dict[str, list[dict]] = {}
+            for il in inlink_rows:
+                target = il["target_url"]
+                if target not in inlinks_by_url:
+                    inlinks_by_url[target] = []
+                inlinks_by_url[target].append({
+                    "source_url": il["source_url"],
+                    "anchor_text": il["anchor_text"],
+                })
+
+            for pdf in pdfs:
+                pdf["inlinks"] = inlinks_by_url.get(pdf["url"], [])
+                pdf["inlink_count"] = len(pdf["inlinks"])
+
+                # Generate issues
+                issues = []
+                if not pdf["pdf_title"]:
+                    issues.append({"type": "missing_title", "severity": "warning", "message": "PDF has no title metadata"})
+                if pdf["file_size_bytes"] and pdf["file_size_bytes"] > 5 * 1024 * 1024:
+                    issues.append({"type": "large_file", "severity": "warning", "message": f"PDF is {pdf['file_size_kb']:.0f} KB ({pdf['file_size_bytes'] / 1024 / 1024:.1f} MB)"})
+                if pdf["status_code"] and pdf["status_code"] >= 400:
+                    issues.append({"type": "broken", "severity": "critical", "message": f"PDF returns HTTP {pdf['status_code']}"})
+                if pdf["response_time_ms"] and pdf["response_time_ms"] > 5000:
+                    issues.append({"type": "slow", "severity": "info", "message": f"PDF takes {pdf['response_time_ms']}ms to load"})
+                pdf["issues"] = issues
+                pdf["issue_count"] = len(issues)
+        else:
+            for pdf in pdfs:
+                pdf["inlink_count"] = 0
+                pdf["issue_count"] = 0
+
+        # Stats
+        total_pdfs = len(pdfs)
+        broken = sum(1 for p in pdfs if p["status_code"] and p["status_code"] >= 400)
+        large = sum(1 for p in pdfs if p.get("file_size_bytes", 0) and p["file_size_bytes"] > 5 * 1024 * 1024)
+        missing_title = sum(1 for p in pdfs if not p["pdf_title"])
+        total_size = sum(p.get("file_size_bytes", 0) or 0 for p in pdfs)
+
+        return {
+            "stats": {
+                "total_pdfs": total_pdfs,
+                "broken": broken,
+                "large_files": large,
+                "missing_title": missing_title,
+                "total_size_bytes": total_size,
+                "total_size_mb": round(total_size / 1024 / 1024, 2) if total_size else 0,
+            },
+            "pdfs": pdfs,
+        }

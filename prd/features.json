@@ -708,15 +708,22 @@
       "id": "3.11",
       "phase": 3,
       "name": "PDF Audit",
-      "status": "planned",
+      "status": "done",
       "priority": "important",
-      "backend": false,
-      "frontend": false,
-      "files_backend": [],
-      "files_frontend": [],
+      "backend": true,
+      "frontend": true,
+      "files_backend": [
+        "app/repositories/url_repo.py",
+        "app/api/v1/urls.py"
+      ],
+      "files_frontend": [
+        "app/(dashboard)/crawls/[crawlId]/page.tsx",
+        "lib/api-client.ts"
+      ],
       "depends_on": [
         "1.1"
-      ]
+      ],
+      "notes": "PDF audit tab showing all PDFs found during crawl with file size, status, title, inlinks, and issues (broken, large, missing title, slow)."
     },
     {
       "id": "3.12",

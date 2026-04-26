@@ -34,7 +34,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "link_graph" | "orphan_pages" | "content_quality" | "depth_analysis" | "response_times" | "readability" | "og_audit" | "resources" | "mobile" | "accessibility" | "sd_validation" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "link_graph" | "orphan_pages" | "content_quality" | "depth_analysis" | "response_times" | "readability" | "og_audit" | "resources" | "mobile" | "accessibility" | "sd_validation" | "pdf_audit" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -80,6 +80,7 @@ const TABS: TabDef[] = [
   { key: "mobile", label: "Mobile", icon: <Smartphone className="h-3 w-3" /> },
   { key: "accessibility", label: "Accessibility", icon: <Accessibility className="h-3 w-3" /> },
   { key: "sd_validation", label: "SD Validation", icon: <Braces className="h-3 w-3" /> },
+  { key: "pdf_audit", label: "PDFs", icon: <FileText className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -256,6 +257,9 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
     { label: "All", filter: {} },
   ],
   sd_validation: [
+    { label: "All", filter: {} },
+  ],
+  pdf_audit: [
     { label: "All", filter: {} },
   ],
   issues: [
@@ -619,6 +623,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     enabled: !!crawl && activeTab === "sd_validation" && isTerminal,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: pdfAuditData, isLoading: pdfAuditLoading } = useQuery<any>({
+    queryKey: ["crawl-pdf-audit", crawlId],
+    queryFn: () => urlsApi.pdfAudit(crawlId),
+    enabled: !!crawl && activeTab === "pdf_audit" && isTerminal,
+  });
+
   const { data: issueSummary } = useQuery({
     queryKey: ["crawl-issues-summary", crawlId],
     queryFn: () => issuesApi.summary(crawlId),
@@ -892,6 +903,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <AccessibilityPanel data={a11yData} loading={a11yLoading} isTerminal={isTerminal} />
             ) : activeTab === "sd_validation" ? (
               <SdValidationPanel data={sdValidationData} loading={sdValidationLoading} isTerminal={isTerminal} />
+            ) : activeTab === "pdf_audit" ? (
+              <PdfAuditPanel data={pdfAuditData} loading={pdfAuditLoading} isTerminal={isTerminal} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -907,7 +920,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
                   <button onClick={() => setLogCursor(timelineData?.next_cursor)} disabled={!timelineData?.next_cursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
                 </div>
               </>
-            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" || activeTab === "link_graph" || activeTab === "orphan_pages" || activeTab === "content_quality" || activeTab === "depth_analysis" || activeTab === "response_times" || activeTab === "readability" || activeTab === "og_audit" || activeTab === "resources" || activeTab === "mobile" || activeTab === "accessibility" || activeTab === "sd_validation" ? (
+            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" || activeTab === "link_graph" || activeTab === "orphan_pages" || activeTab === "content_quality" || activeTab === "depth_analysis" || activeTab === "response_times" || activeTab === "readability" || activeTab === "og_audit" || activeTab === "resources" || activeTab === "mobile" || activeTab === "accessibility" || activeTab === "sd_validation" || activeTab === "pdf_audit" ? (
               <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
             ) : activeTab === "issues" ? (
               <>
@@ -4502,6 +4515,101 @@ function SegmentsPanel({ data, loading, isTerminal }: { data: any[] | undefined;
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── PDF Audit Panel ────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function PdfAuditPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">PDF audit available after crawl completes</div>;
+  if (loading) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Loading PDF audit...</div>;
+  if (!data || !data.pdfs) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No PDF audit data</div>;
+
+  const stats = data.stats || {};
+  const pdfs = data.pdfs || [];
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Stats bar */}
+      <div className="flex gap-4 p-3 border-b bg-gray-50 text-xs">
+        <div className="flex items-center gap-1.5">
+          <span className="font-semibold text-blue-600">{stats.total_pdfs ?? 0}</span>
+          <span className="text-gray-500">PDFs found</span>
+        </div>
+        {stats.broken > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-red-600">{stats.broken}</span>
+            <span className="text-gray-500">broken</span>
+          </div>
+        )}
+        {stats.large_files > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-amber-600">{stats.large_files}</span>
+            <span className="text-gray-500">large (&gt;5MB)</span>
+          </div>
+        )}
+        {stats.missing_title > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-amber-600">{stats.missing_title}</span>
+            <span className="text-gray-500">missing title</span>
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 ml-auto">
+          <span className="text-gray-500">Total size:</span>
+          <span className="font-semibold">{stats.total_size_mb ?? 0} MB</span>
+        </div>
+      </div>
+
+      {pdfs.length === 0 ? (
+        <div className="flex items-center justify-center h-64 text-sm text-gray-400">No PDF files found in this crawl</div>
+      ) : (
+        <div className="overflow-auto flex-1">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 sticky top-0">
+              <tr className="border-b">
+                <th className="text-left py-2 px-2 font-medium text-gray-600">URL</th>
+                <th className="text-center py-2 px-2 font-medium text-gray-600 w-16">Status</th>
+                <th className="text-right py-2 px-2 font-medium text-gray-600 w-20">Size</th>
+                <th className="text-right py-2 px-2 font-medium text-gray-600 w-16">Speed</th>
+                <th className="text-left py-2 px-2 font-medium text-gray-600 w-40">Title</th>
+                <th className="text-center py-2 px-2 font-medium text-gray-600 w-16">Inlinks</th>
+                <th className="text-center py-2 px-2 font-medium text-gray-600 w-16">Issues</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pdfs.map((pdf: any, i: number) => {
+                const statusColor = !pdf.status_code ? "text-gray-400" : pdf.status_code >= 400 ? "text-red-600 font-semibold" : pdf.status_code >= 300 ? "text-amber-600" : "text-green-600";
+                return (
+                  <tr key={i} className="border-b border-gray-100 hover:bg-blue-50/30">
+                    <td className="py-1.5 px-2 font-mono truncate max-w-[400px]" title={pdf.url}>{pdf.url}</td>
+                    <td className={`py-1.5 px-2 text-center ${statusColor}`}>{pdf.status_code ?? "-"}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">
+                      {pdf.file_size_kb ? (
+                        <span className={pdf.file_size_bytes > 5 * 1024 * 1024 ? "text-amber-600 font-semibold" : ""}>
+                          {pdf.file_size_kb > 1024 ? `${(pdf.file_size_kb / 1024).toFixed(1)} MB` : `${pdf.file_size_kb} KB`}
+                        </span>
+                      ) : "-"}
+                    </td>
+                    <td className="py-1.5 px-2 text-right font-mono text-gray-600">{pdf.response_time_ms ? `${pdf.response_time_ms}ms` : "-"}</td>
+                    <td className="py-1.5 px-2 truncate max-w-[200px]" title={pdf.pdf_title || ""}>
+                      {pdf.pdf_title || <span className="text-amber-500 italic">No title</span>}
+                    </td>
+                    <td className="py-1.5 px-2 text-center text-gray-600">{pdf.inlink_count ?? 0}</td>
+                    <td className="py-1.5 px-2 text-center">
+                      {pdf.issue_count > 0 ? (
+                        <span className="text-red-600 font-semibold">{pdf.issue_count}</span>
+                      ) : (
+                        <span className="text-green-600">0</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
