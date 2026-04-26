@@ -1185,7 +1185,7 @@ function CustomSearchTable({ items, loading, crawlActive }: {
   );
 }
 
-type DetailTab = "url" | "seo" | "inlinks" | "outlinks" | "structured" | "headers";
+type DetailTab = "url" | "seo" | "content" | "inlinks" | "outlinks" | "structured" | "headers";
 
 function BottomDetailPanel({ crawlId, urlId, detail, onClose }: { crawlId: string; urlId: string; detail: CrawledUrlDetail | null; onClose: () => void; }) {
   const [detailTab, setDetailTab] = useState<DetailTab>("url");
@@ -1206,6 +1206,7 @@ function BottomDetailPanel({ crawlId, urlId, detail, onClose }: { crawlId: strin
   const tabs: { key: DetailTab; label: string }[] = [
     { key: "url", label: "URL Details" },
     { key: "seo", label: "SEO Data" },
+    { key: "content", label: "Content" },
     { key: "inlinks", label: `Inlinks${inlinks ? ` (${inlinks.length})` : ""}` },
     { key: "outlinks", label: `Outlinks${outlinks ? ` (${outlinks.length})` : ""}` },
     { key: "structured", label: "Structured Data" },
@@ -1253,6 +1254,28 @@ function BottomDetailPanel({ crawlId, urlId, detail, onClose }: { crawlId: strin
               <><span className="text-gray-400 font-medium">Hreflang</span><span className="text-gray-700">{(seoData.hreflang as { lang: string; href: string }[]).map((h) => `${h.lang}: ${h.href}`).join(" | ")}</span></>
             ) : null}
             <span className="text-gray-400 font-medium">Crawled At</span><span className="text-gray-700">{new Date(detail.crawled_at).toLocaleString()}</span>
+          </div>
+        ) : detailTab === "content" ? (
+          <div className="space-y-3">
+            {/* SERP Preview */}
+            <div className="bg-white rounded border border-gray-200 p-2">
+              <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 font-bold">SERP Preview</div>
+              <div className="max-w-[600px]">
+                <div className="text-[13px] text-[#1a0dab] font-medium leading-tight truncate">{detail.title || detail.url}</div>
+                <div className="text-[11px] text-green-800 truncate">{detail.url}</div>
+                <div className="text-[11px] text-gray-600 line-clamp-2 leading-relaxed">{detail.meta_description || "No meta description"}</div>
+              </div>
+            </div>
+            {/* Content Metrics */}
+            <div className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-1">
+              <span className="text-gray-400 font-medium">Word Count</span><span className="text-gray-700">{detail.word_count ?? "—"}</span>
+              <span className="text-gray-400 font-medium">Link Score</span><span className="text-gray-700">{detail.link_score != null ? `${detail.link_score}/100` : "—"}</span>
+              <span className="text-gray-400 font-medium">Text Ratio</span><span className="text-gray-700">{detail.text_ratio != null ? `${(detail.text_ratio * 100).toFixed(1)}%` : "—"}</span>
+              <span className="text-gray-400 font-medium">Readability</span><span className={`font-medium ${(detail.readability_score ?? 0) >= 60 ? "text-green-700" : (detail.readability_score ?? 0) >= 30 ? "text-yellow-600" : "text-red-600"}`}>{detail.readability_score != null ? `${detail.readability_score.toFixed(1)} (Flesch)` : "—"}</span>
+              <span className="text-gray-400 font-medium">Avg Words/Sentence</span><span className="text-gray-700">{detail.avg_words_per_sentence != null ? detail.avg_words_per_sentence.toFixed(1) : "—"}</span>
+              <span className="text-gray-400 font-medium">Title Length</span><span className={`${(detail.title_length ?? 0) > 60 ? "text-red-600" : (detail.title_length ?? 0) < 30 ? "text-yellow-600" : "text-green-700"}`}>{detail.title_length != null ? `${detail.title_length} chars${detail.title_pixel_width != null ? ` / ${detail.title_pixel_width}px` : ""}` : "—"}</span>
+              <span className="text-gray-400 font-medium">Meta Desc Length</span><span className={`${(detail.meta_desc_length ?? 0) > 155 ? "text-red-600" : (detail.meta_desc_length ?? 0) < 70 ? "text-yellow-600" : "text-green-700"}`}>{detail.meta_desc_length != null ? `${detail.meta_desc_length} chars` : "—"}</span>
+            </div>
           </div>
         ) : detailTab === "inlinks" ? (
           <LinksTable links={inlinks ?? []} direction="inlinks" />
