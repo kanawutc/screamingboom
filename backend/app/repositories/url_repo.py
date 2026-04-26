@@ -1893,3 +1893,129 @@ class UrlRepository:
                 "total_edges": len(edges),
             },
         }
+
+    async def get_orphan_pages(
+        self, crawl_id: uuid.UUID, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        """Find HTML pages with zero inlinks (orphan pages)."""
+        sql = text("""
+            SELECT
+                cu.id,
+                cu.url,
+                cu.status_code,
+                COALESCE(cu.seo_data->>'title', '') AS title,
+                cu.word_count,
+                cu.is_indexable
+            FROM crawled_urls cu
+            WHERE cu.crawl_id = :crawl_id
+                AND cu.content_type LIKE 'text/html%%'
+                AND NOT EXISTS (
+                    SELECT 1 FROM page_links pl
+                    WHERE pl.crawl_id = cu.crawl_id
+                        AND pl.target_url_hash = cu.url_hash
+                        AND pl.link_type = 'internal'
+                        AND pl.source_url_id != cu.id
+                )
+            ORDER BY cu.url
+            LIMIT :limit
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        return [
+            {
+                "url_id": str(r.id),
+                "url": r.url,
+                "status_code": r.status_code,
+                "title": r.title or "",
+                "word_count": r.word_count,
+                "is_indexable": r.is_indexable,
+            }
+            for r in result.all()
+        ]
+
+    async def get_content_quality(
+        self, crawl_id: uuid.UUID, limit: int = 200
+    ) -> dict[str, Any]:
+        """Analyze content quality metrics: thin content, word count distribution, readability."""
+        s = self._session
+
+        # Word count distribution
+        dist_sql = text("""
+            SELECT
+                CASE
+                    WHEN word_count IS NULL OR word_count = 0 THEN 'empty'
+                    WHEN word_count < 100 THEN 'thin (<100)'
+                    WHEN word_count < 300 THEN 'short (100-300)'
+                    WHEN word_count < 1000 THEN 'medium (300-1000)'
+                    WHEN word_count < 3000 THEN 'long (1000-3000)'
+                    ELSE 'very_long (3000+)'
+                END AS bucket,
+                COUNT(*) AS count,
+                AVG(word_count)::int AS avg_words
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+            GROUP BY bucket
+            ORDER BY MIN(COALESCE(word_count, 0))
+        """)
+        dist_result = await s.execute(dist_sql, {"crawl_id": str(crawl_id)})
+        distribution = [
+            {"bucket": r.bucket, "count": r.count, "avg_words": r.avg_words}
+            for r in dist_result.all()
+        ]
+
+        # Thin content pages
+        thin_sql = text("""
+            SELECT
+                id, url, word_count,
+                COALESCE(seo_data->>'title', '') AS title,
+                status_code, is_indexable
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND (word_count IS NULL OR word_count < 100)
+                AND status_code >= 200 AND status_code < 300
+            ORDER BY COALESCE(word_count, 0) ASC
+            LIMIT :limit
+        """)
+        thin_result = await s.execute(thin_sql, {"crawl_id": str(crawl_id), "limit": limit})
+        thin_pages = [
+            {
+                "url_id": str(r.id),
+                "url": r.url,
+                "word_count": r.word_count or 0,
+                "title": r.title or "",
+                "status_code": r.status_code,
+                "is_indexable": r.is_indexable,
+            }
+            for r in thin_result.all()
+        ]
+
+        # Overall stats
+        stats_sql = text("""
+            SELECT
+                COUNT(*) AS total,
+                AVG(word_count)::int AS avg_words,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY word_count)::int AS median_words,
+                MAX(word_count) AS max_words,
+                SUM(CASE WHEN word_count IS NULL OR word_count < 100 THEN 1 ELSE 0 END) AS thin_count
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND status_code >= 200 AND status_code < 300
+        """)
+        stats_result = await s.execute(stats_sql, {"crawl_id": str(crawl_id)})
+        stats_row = stats_result.first()
+
+        return {
+            "distribution": distribution,
+            "thin_pages": thin_pages,
+            "stats": {
+                "total_pages": stats_row.total if stats_row else 0,
+                "avg_words": stats_row.avg_words if stats_row else 0,
+                "median_words": stats_row.median_words if stats_row else 0,
+                "max_words": stats_row.max_words if stats_row else 0,
+                "thin_count": stats_row.thin_count if stats_row else 0,
+            },
+        }

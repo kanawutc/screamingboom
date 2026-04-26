@@ -14,7 +14,7 @@ import {
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
   X, Download, Search, Link2, Shield, Navigation, FileCode2, Sheet, Braces,
   FastForward, Network, Copy, Cookie, Lock, Languages, Timer, Bot, Map, LayoutDashboard, FolderTree,
-  ClipboardList,
+  ClipboardList, Unlink, BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -34,7 +34,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "link_graph" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "link_graph" | "orphan_pages" | "content_quality" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -70,6 +70,8 @@ const TABS: TabDef[] = [
   { key: "keywords", label: "Keywords", icon: <Hash className="h-3 w-3" /> },
   { key: "report", label: "Report", icon: <ClipboardList className="h-3 w-3" /> },
   { key: "link_graph", label: "Link Graph", icon: <Network className="h-3 w-3" /> },
+  { key: "orphan_pages", label: "Orphan Pages", icon: <Unlink className="h-3 w-3" /> },
+  { key: "content_quality", label: "Content Quality", icon: <BarChart3 className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -218,6 +220,12 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   link_graph: [
     { label: "All", filter: {} },
   ],
+  orphan_pages: [
+    { label: "All", filter: {} },
+  ],
+  content_quality: [
+    { label: "All", filter: {} },
+  ],
   issues: [
     { label: "All", filter: {} },
     { label: "Critical", filter: { severity: "critical" } },
@@ -311,7 +319,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords" && activeTab !== "report" && activeTab !== "link_graph",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords" && activeTab !== "report" && activeTab !== "link_graph" && activeTab !== "orphan_pages" && activeTab !== "content_quality",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -507,6 +515,20 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-link-graph", crawlId],
     queryFn: () => urlsApi.linkGraph(crawlId),
     enabled: !!crawl && activeTab === "link_graph" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: orphanData, isLoading: orphanLoading } = useQuery<any[]>({
+    queryKey: ["crawl-orphan-pages", crawlId],
+    queryFn: () => urlsApi.orphanPages(crawlId),
+    enabled: !!crawl && activeTab === "orphan_pages" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: contentQualityData, isLoading: contentQualityLoading } = useQuery<any>({
+    queryKey: ["crawl-content-quality", crawlId],
+    queryFn: () => urlsApi.contentQuality(crawlId),
+    enabled: !!crawl && activeTab === "content_quality" && isTerminal,
   });
 
   const { data: issueSummary } = useQuery({
@@ -762,6 +784,10 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <ReportPanel data={reportData} loading={reportLoading} isTerminal={isTerminal} />
             ) : activeTab === "link_graph" ? (
               <LinkGraphPanel data={linkGraphData} loading={linkGraphLoading} isTerminal={isTerminal} />
+            ) : activeTab === "orphan_pages" ? (
+              <OrphanPagesPanel data={orphanData} loading={orphanLoading} isTerminal={isTerminal} />
+            ) : activeTab === "content_quality" ? (
+              <ContentQualityPanel data={contentQualityData} loading={contentQualityLoading} isTerminal={isTerminal} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -777,7 +803,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
                   <button onClick={() => setLogCursor(timelineData?.next_cursor)} disabled={!timelineData?.next_cursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
                 </div>
               </>
-            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" || activeTab === "link_graph" ? (
+            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" || activeTab === "link_graph" || activeTab === "orphan_pages" || activeTab === "content_quality" ? (
               <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
             ) : activeTab === "issues" ? (
               <>
@@ -2978,6 +3004,176 @@ function KeywordsPanel({ data, loading, isTerminal }: { data: any | undefined; l
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── Orphan Pages Panel ──────────────────────────────────────────────────
+function OrphanPagesPanel({ data, loading, isTerminal }: { data: any[] | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Orphan pages available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Finding orphan pages...</div>;
+  if (!data || data.length === 0) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No orphan pages found — all pages have inlinks</div>;
+
+  const indexable = data.filter((p: any) => p.is_indexable).length;
+
+  return (
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      <div className="flex items-center gap-4 text-xs text-gray-600">
+        <span className="flex items-center gap-1.5">
+          <Unlink className="h-3.5 w-3.5 text-orange-500" />
+          <strong>{data.length}</strong> orphan pages (0 inlinks)
+        </span>
+        <span><strong>{indexable}</strong> indexable</span>
+        <span><strong>{data.length - indexable}</strong> non-indexable</span>
+      </div>
+
+      {indexable > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-xs text-orange-800">
+          <strong>{indexable} indexable pages</strong> have no internal links pointing to them.
+          These pages may not be discovered by search engines. Consider adding internal links from relevant pages.
+        </div>
+      )}
+
+      <div className="bg-white rounded-lg border border-gray-200">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-gray-50 z-10">
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="text-left py-1.5 px-2">URL</th>
+              <th className="text-left py-1.5 px-2 w-48">Title</th>
+              <th className="text-center py-1.5 px-2 w-16">Status</th>
+              <th className="text-right py-1.5 px-2 w-16">Words</th>
+              <th className="text-center py-1.5 px-2 w-20">Indexable</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {data.map((page: any, i: number) => (
+              <tr key={i} className="hover:bg-gray-50/50">
+                <td className="py-1.5 px-2 text-blue-600 truncate max-w-md" title={page.url}>
+                  {truncateUrl(page.url, 60)}
+                </td>
+                <td className="py-1.5 px-2 text-gray-700 truncate max-w-[12rem]" title={page.title}>
+                  {page.title || <span className="text-gray-300 italic">No title</span>}
+                </td>
+                <td className="py-1.5 px-2 text-center">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                    page.status_code >= 200 && page.status_code < 300 ? "bg-green-50 text-green-700" :
+                    page.status_code >= 300 && page.status_code < 400 ? "bg-amber-50 text-amber-700" :
+                    "bg-red-50 text-red-700"
+                  }`}>{page.status_code}</span>
+                </td>
+                <td className="py-1.5 px-2 text-right font-mono text-gray-600">{page.word_count || 0}</td>
+                <td className="py-1.5 px-2 text-center">
+                  {page.is_indexable ? (
+                    <span className="text-green-600">Yes</span>
+                  ) : (
+                    <span className="text-gray-400">No</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Content Quality Panel ──────────────────────────────────────────────
+function ContentQualityPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Content quality available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Analyzing content quality...</div>;
+  if (!data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No content data</div>;
+
+  const { distribution = [], thin_pages = [], stats = {} } = data;
+  const maxCount = Math.max(...distribution.map((d: any) => d.count), 1);
+  const bucketColors: Record<string, string> = {
+    "empty": "bg-red-400",
+    "thin (<100)": "bg-orange-400",
+    "short (100-300)": "bg-amber-400",
+    "medium (300-1000)": "bg-blue-400",
+    "long (1000-3000)": "bg-emerald-400",
+    "very_long (3000+)": "bg-purple-400",
+  };
+
+  return (
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      {/* Stats */}
+      <div className="grid grid-cols-5 gap-2">
+        {[
+          { label: "Total Pages", value: stats.total_pages?.toLocaleString() ?? "0" },
+          { label: "Avg Words", value: stats.avg_words?.toLocaleString() ?? "0" },
+          { label: "Median Words", value: stats.median_words?.toLocaleString() ?? "0" },
+          { label: "Max Words", value: stats.max_words?.toLocaleString() ?? "0" },
+          { label: "Thin Pages", value: stats.thin_count?.toLocaleString() ?? "0", alert: stats.thin_count > 0 },
+        ].map((stat, i) => (
+          <div key={i} className={`rounded-lg border p-2 text-center ${stat.alert ? "bg-orange-50 border-orange-200" : "bg-white border-gray-200"}`}>
+            <div className={`text-lg font-bold ${stat.alert ? "text-orange-600" : "text-gray-900"}`}>{stat.value}</div>
+            <div className="text-[10px] text-gray-500">{stat.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Distribution chart */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <h3 className="text-xs font-semibold text-gray-700 mb-3">Word Count Distribution</h3>
+        <div className="space-y-2">
+          {distribution.map((d: any, i: number) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-[10px] text-gray-500 w-28 text-right flex-shrink-0">{d.bucket}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-4 relative">
+                <div
+                  className={`h-4 rounded-full ${bucketColors[d.bucket] || "bg-gray-400"} transition-all`}
+                  style={{ width: `${Math.max((d.count / maxCount) * 100, 2)}%` }}
+                />
+                <span className="absolute inset-y-0 flex items-center pl-2 text-[10px] font-medium text-white mix-blend-difference">
+                  {d.count} pages
+                </span>
+              </div>
+              <span className="text-[10px] text-gray-400 w-20 flex-shrink-0">avg {d.avg_words} words</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Thin content pages */}
+      {thin_pages.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200">
+          <div className="px-3 py-2 border-b border-gray-100">
+            <h3 className="text-xs font-semibold text-gray-700">Thin Content Pages ({thin_pages.length})</h3>
+            <p className="text-[10px] text-gray-400">Pages with fewer than 100 words — may lack sufficient content for SEO</p>
+          </div>
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50">
+              <tr className="border-b border-gray-200 text-gray-500">
+                <th className="text-left py-1.5 px-2">URL</th>
+                <th className="text-left py-1.5 px-2 w-40">Title</th>
+                <th className="text-right py-1.5 px-2 w-16">Words</th>
+                <th className="text-center py-1.5 px-2 w-20">Indexable</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {thin_pages.map((page: any, i: number) => (
+                <tr key={i} className="hover:bg-gray-50/50">
+                  <td className="py-1.5 px-2 text-blue-600 truncate max-w-md" title={page.url}>
+                    {truncateUrl(page.url, 60)}
+                  </td>
+                  <td className="py-1.5 px-2 text-gray-700 truncate max-w-[10rem]" title={page.title}>
+                    {page.title || <span className="text-gray-300 italic">No title</span>}
+                  </td>
+                  <td className="py-1.5 px-2 text-right font-mono">
+                    <span className={page.word_count === 0 ? "text-red-500 font-bold" : "text-orange-600"}>
+                      {page.word_count}
+                    </span>
+                  </td>
+                  <td className="py-1.5 px-2 text-center">
+                    {page.is_indexable ? <span className="text-green-600">Yes</span> : <span className="text-gray-400">No</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

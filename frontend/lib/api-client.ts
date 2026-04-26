@@ -300,6 +300,14 @@ export const urlsApi = {
   linkGraph: (crawlId: string, maxNodes = 200) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/link-graph${qs({ max_nodes: maxNodes })}`),
+
+  orphanPages: (crawlId: string, limit = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any[]>(`/crawls/${crawlId}/orphan-pages${qs({ limit })}`),
+
+  contentQuality: (crawlId: string, limit = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/content-quality${qs({ limit })}`),
 };
 
 export const extractionRulesApi = {

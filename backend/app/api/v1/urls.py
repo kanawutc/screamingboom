@@ -740,6 +740,28 @@ async def get_link_graph(
     return await repo.get_link_graph(crawl_id, max_nodes=max_nodes)
 
 
+@router.get("/crawls/{crawl_id}/orphan-pages")
+async def get_orphan_pages(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(200, ge=1, le=1000),
+) -> list[dict]:
+    """Find pages with zero inlinks (orphan pages)."""
+    repo = UrlRepository(db)
+    return await repo.get_orphan_pages(crawl_id, limit=limit)
+
+
+@router.get("/crawls/{crawl_id}/content-quality")
+async def get_content_quality(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(200, ge=1, le=1000),
+) -> dict:
+    """Analyze content quality metrics: word count distribution, thin content detection."""
+    repo = UrlRepository(db)
+    return await repo.get_content_quality(crawl_id, limit=limit)
+
+
 @router.get("/crawls/{crawl_id}/heading-hierarchy")
 async def get_heading_hierarchy(
     crawl_id: uuid.UUID,
