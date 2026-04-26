@@ -34,7 +34,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "link_graph" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -69,6 +69,7 @@ const TABS: TabDef[] = [
   { key: "segments", label: "Segments", icon: <Sheet className="h-3 w-3" /> },
   { key: "keywords", label: "Keywords", icon: <Hash className="h-3 w-3" /> },
   { key: "report", label: "Report", icon: <ClipboardList className="h-3 w-3" /> },
+  { key: "link_graph", label: "Link Graph", icon: <Network className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -214,6 +215,9 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   report: [
     { label: "All", filter: {} },
   ],
+  link_graph: [
+    { label: "All", filter: {} },
+  ],
   issues: [
     { label: "All", filter: {} },
     { label: "Critical", filter: { severity: "critical" } },
@@ -307,7 +311,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords" && activeTab !== "report",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords" && activeTab !== "report" && activeTab !== "link_graph",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -496,6 +500,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-report", crawlId],
     queryFn: () => urlsApi.summaryReport(crawlId),
     enabled: !!crawl && activeTab === "report" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: linkGraphData, isLoading: linkGraphLoading } = useQuery<any>({
+    queryKey: ["crawl-link-graph", crawlId],
+    queryFn: () => urlsApi.linkGraph(crawlId),
+    enabled: !!crawl && activeTab === "link_graph" && isTerminal,
   });
 
   const { data: issueSummary } = useQuery({
@@ -749,6 +760,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <KeywordsPanel data={keywordsData} loading={keywordsLoading} isTerminal={isTerminal} />
             ) : activeTab === "report" ? (
               <ReportPanel data={reportData} loading={reportLoading} isTerminal={isTerminal} />
+            ) : activeTab === "link_graph" ? (
+              <LinkGraphPanel data={linkGraphData} loading={linkGraphLoading} isTerminal={isTerminal} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -764,7 +777,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
                   <button onClick={() => setLogCursor(timelineData?.next_cursor)} disabled={!timelineData?.next_cursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
                 </div>
               </>
-            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" ? (
+            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" || activeTab === "link_graph" ? (
               <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
             ) : activeTab === "issues" ? (
               <>
@@ -2965,6 +2978,227 @@ function KeywordsPanel({ data, loading, isTerminal }: { data: any | undefined; l
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── Link Graph Panel ────────────────────────────────────────────────────
+function LinkGraphPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [hoveredNode, setHoveredNode] = useState<any>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Simple force simulation in a ref
+  const simRef = useRef<{
+    nodes: { id: string; url: string; title: string; inlinks: number; status_code: number; is_indexable: boolean; x: number; y: number; vx: number; vy: number; radius: number }[];
+    edges: { source: string; target: string }[];
+    running: boolean;
+    frame: number;
+    offsetX: number;
+    offsetY: number;
+    scale: number;
+    dragging: boolean;
+    dragStart: { x: number; y: number };
+  } | null>(null);
+
+  useEffect(() => {
+    if (!data || !data.nodes?.length || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const W = canvas.parentElement?.clientWidth || 800;
+    const H = canvas.parentElement?.clientHeight || 600;
+    canvas.width = W;
+    canvas.height = H;
+
+    const maxInlinks = Math.max(...data.nodes.map((n: any) => n.inlinks), 1);
+    const nodes = data.nodes.map((n: any) => ({
+      ...n,
+      x: W / 2 + (Math.random() - 0.5) * W * 0.6,
+      y: H / 2 + (Math.random() - 0.5) * H * 0.6,
+      vx: 0,
+      vy: 0,
+      radius: Math.max(4, Math.min(16, 4 + (n.inlinks / maxInlinks) * 12)),
+    }));
+
+    const sim = {
+      nodes,
+      edges: data.edges || [],
+      running: true,
+      frame: 0,
+      offsetX: 0,
+      offsetY: 0,
+      scale: 1,
+      dragging: false,
+      dragStart: { x: 0, y: 0 },
+    };
+    simRef.current = sim;
+
+    const nodeMap: Record<string, any> = {};
+    for (const n of nodes) nodeMap[n.id] = n;
+
+    function tick() {
+      if (!sim.running) return;
+
+      // Center gravity
+      for (const node of sim.nodes) {
+        node.vx += (W / 2 - node.x) * 0.001;
+        node.vy += (H / 2 - node.y) * 0.001;
+      }
+
+      // Repulsion between nodes
+      for (let i = 0; i < sim.nodes.length; i++) {
+        for (let j = i + 1; j < sim.nodes.length; j++) {
+          const a = sim.nodes[i], b = sim.nodes[j];
+          let dx = b.x - a.x, dy = b.y - a.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const force = 300 / (dist * dist);
+          dx *= force; dy *= force;
+          a.vx -= dx; a.vy -= dy;
+          b.vx += dx; b.vy += dy;
+        }
+      }
+
+      // Spring forces for edges
+      for (const edge of sim.edges) {
+        const a = nodeMap[edge.source];
+        const b = nodeMap[edge.target];
+        if (!a || !b) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const force = (dist - 80) * 0.005;
+        const fx = (dx / dist) * force, fy = (dy / dist) * force;
+        a.vx += fx; a.vy += fy;
+        b.vx -= fx; b.vy -= fy;
+      }
+
+      // Apply velocities with damping
+      const damping = 0.85;
+      for (const node of sim.nodes) {
+        node.vx *= damping;
+        node.vy *= damping;
+        node.x += node.vx;
+        node.y += node.vy;
+        // Bounds
+        node.x = Math.max(node.radius, Math.min(W - node.radius, node.x));
+        node.y = Math.max(node.radius, Math.min(H - node.radius, node.y));
+      }
+
+      // Draw
+      ctx!.clearRect(0, 0, W, H);
+      ctx!.save();
+      ctx!.translate(sim.offsetX, sim.offsetY);
+      ctx!.scale(sim.scale, sim.scale);
+
+      // Edges
+      ctx!.strokeStyle = "rgba(148, 163, 184, 0.3)";
+      ctx!.lineWidth = 0.5;
+      for (const edge of sim.edges) {
+        const a = nodeMap[edge.source];
+        const b = nodeMap[edge.target];
+        if (!a || !b) continue;
+        ctx!.beginPath();
+        ctx!.moveTo(a.x, a.y);
+        ctx!.lineTo(b.x, b.y);
+        ctx!.stroke();
+      }
+
+      // Nodes
+      for (const node of sim.nodes) {
+        ctx!.beginPath();
+        ctx!.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+        const sc = node.status_code;
+        ctx!.fillStyle = sc >= 200 && sc < 300 ? (node.is_indexable ? "#3b82f6" : "#94a3b8") :
+                          sc >= 300 && sc < 400 ? "#f59e0b" :
+                          sc >= 400 ? "#ef4444" : "#6b7280";
+        ctx!.fill();
+        ctx!.strokeStyle = "rgba(255,255,255,0.8)";
+        ctx!.lineWidth = 1;
+        ctx!.stroke();
+      }
+
+      ctx!.restore();
+
+      sim.frame++;
+      if (sim.frame < 300) {
+        requestAnimationFrame(tick);
+      }
+    }
+
+    requestAnimationFrame(tick);
+
+    return () => { sim.running = false; };
+  }, [data]);
+
+  // Mouse hover detection
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !simRef.current) return;
+    const rect = canvas.getBoundingClientRect();
+    const sim = simRef.current;
+    const mx = (e.clientX - rect.left - sim.offsetX) / sim.scale;
+    const my = (e.clientY - rect.top - sim.offsetY) / sim.scale;
+    setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+
+    let found: any = null;
+    for (const node of sim.nodes) {
+      const dx = node.x - mx, dy = node.y - my;
+      if (dx * dx + dy * dy < (node.radius + 3) * (node.radius + 3)) {
+        found = node;
+        break;
+      }
+    }
+    setHoveredNode(found);
+  }, []);
+
+  // Mouse wheel zoom
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
+    if (!simRef.current) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    simRef.current.scale = Math.max(0.3, Math.min(3, simRef.current.scale * delta));
+  }, []);
+
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Link graph available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Building link graph...</div>;
+  if (!data || !data.nodes?.length) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No link data found</div>;
+
+  return (
+    <div className="relative w-full h-full overflow-hidden bg-gray-50">
+      {/* Stats bar */}
+      <div className="absolute top-2 left-2 z-10 flex items-center gap-3 bg-white/90 backdrop-blur rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600">
+        <span><strong>{data.stats.total_nodes}</strong> pages</span>
+        <span><strong>{data.stats.total_edges}</strong> links</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Indexable</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 inline-block" /> Non-indexable</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Redirect</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Error</span>
+      </div>
+
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full cursor-crosshair"
+        onMouseMove={handleMouseMove}
+        onWheel={handleWheel}
+      />
+
+      {/* Tooltip */}
+      {hoveredNode && (
+        <div
+          className="absolute z-20 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-xs pointer-events-none max-w-xs"
+          style={{ left: mousePos.x + 12, top: mousePos.y - 8 }}
+        >
+          <p className="font-medium text-gray-900 truncate">{hoveredNode.title || hoveredNode.url}</p>
+          <p className="text-gray-500 truncate">{hoveredNode.url}</p>
+          <div className="flex gap-3 mt-1 text-gray-600">
+            <span>Status: <strong>{hoveredNode.status_code}</strong></span>
+            <span>Inlinks: <strong>{hoveredNode.inlinks}</strong></span>
+            <span>{hoveredNode.is_indexable ? "Indexable" : "Non-indexable"}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

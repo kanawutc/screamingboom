@@ -729,6 +729,17 @@ async def get_url_segments(
     return await repo.get_url_segments(crawl_id)
 
 
+@router.get("/crawls/{crawl_id}/link-graph")
+async def get_link_graph(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    max_nodes: int = Query(200, ge=10, le=500),
+) -> dict:
+    """Get nodes and edges for a force-directed link graph visualization."""
+    repo = UrlRepository(db)
+    return await repo.get_link_graph(crawl_id, max_nodes=max_nodes)
+
+
 @router.get("/crawls/{crawl_id}/heading-hierarchy")
 async def get_heading_hierarchy(
     crawl_id: uuid.UUID,

@@ -296,6 +296,10 @@ export const urlsApi = {
   summaryReport: (crawlId: string) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/summary-report`),
+
+  linkGraph: (crawlId: string, maxNodes = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/link-graph${qs({ max_nodes: maxNodes })}`),
 };
 
 export const extractionRulesApi = {

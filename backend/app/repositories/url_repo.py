@@ -1816,3 +1816,80 @@ class UrlRepository:
             }
             for r in result.all()
         ]
+
+    async def get_link_graph(
+        self, crawl_id: uuid.UUID, max_nodes: int = 200
+    ) -> dict[str, Any]:
+        """Return nodes and edges for a force-directed link graph."""
+        s = self._session
+
+        # Get top pages by inlink count (most connected first)
+        nodes_q = text("""
+            WITH inlink_counts AS (
+                SELECT
+                    cu.id,
+                    cu.url,
+                    cu.status_code,
+                    COALESCE(cu.seo_data->>'title', '') AS title,
+                    COUNT(DISTINCT pl.source_url_id) AS inlinks,
+                    cu.is_indexable
+                FROM crawled_urls cu
+                LEFT JOIN page_links pl
+                    ON pl.crawl_id = cu.crawl_id
+                    AND pl.target_url_hash = cu.url_hash
+                    AND pl.link_type = 'internal'
+                WHERE cu.crawl_id = :crawl_id
+                    AND cu.content_type LIKE 'text/html%%'
+                GROUP BY cu.id, cu.url, cu.status_code, cu.seo_data, cu.is_indexable
+                ORDER BY inlinks DESC
+                LIMIT :max_nodes
+            )
+            SELECT * FROM inlink_counts
+        """)
+        node_result = await s.execute(nodes_q, {"crawl_id": str(crawl_id), "max_nodes": max_nodes})
+        node_rows = node_result.all()
+
+        if not node_rows:
+            return {"nodes": [], "edges": [], "stats": {"total_nodes": 0, "total_edges": 0}}
+
+        node_ids = {str(r.id) for r in node_rows}
+        nodes = []
+        for r in node_rows:
+            nodes.append({
+                "id": str(r.id),
+                "url": r.url,
+                "title": r.title or "",
+                "status_code": r.status_code,
+                "inlinks": r.inlinks,
+                "is_indexable": r.is_indexable,
+            })
+
+        # Get edges between the selected nodes
+        edges_q = text("""
+            SELECT DISTINCT
+                pl.source_url_id::text AS source,
+                cu_target.id::text AS target
+            FROM page_links pl
+            JOIN crawled_urls cu_target
+                ON cu_target.crawl_id = pl.crawl_id
+                AND cu_target.url_hash = pl.target_url_hash
+            WHERE pl.crawl_id = :crawl_id
+                AND pl.link_type = 'internal'
+                AND pl.source_url_id::text = ANY(:node_ids)
+                AND cu_target.id::text = ANY(:node_ids)
+                AND pl.source_url_id != cu_target.id
+        """)
+        edge_result = await s.execute(
+            edges_q,
+            {"crawl_id": str(crawl_id), "node_ids": list(node_ids)},
+        )
+        edges = [{"source": r.source, "target": r.target} for r in edge_result.all()]
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "stats": {
+                "total_nodes": len(nodes),
+                "total_edges": len(edges),
+            },
+        }
