@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import urlparse
+from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape as xml_escape
 
+import aiohttp
+import structlog
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
@@ -15,6 +20,8 @@ from app.api.deps import DbSession
 from app.repositories.url_repo import UrlRepository
 from app.schemas.pagination import CursorPage
 from app.schemas.url import CrawledUrlDetail, CrawledUrlResponse, ExternalLinkResponse
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["urls"])
 
@@ -573,3 +580,220 @@ async def get_hreflang_data(
     """Get pages with hreflang tags."""
     repo = UrlRepository(db)
     return await repo.get_hreflang_data(crawl_id, limit=limit)
+
+
+async def _get_crawl_domain(db: DbSession, crawl_id: uuid.UUID) -> tuple[str, str]:
+    """Get scheme and domain from crawl's start_url. Returns (scheme, domain)."""
+    from app.models.crawl import Crawl
+
+    result = await db.get(Crawl, crawl_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Crawl not found")
+    start_url = (result.config or {}).get("start_url", "")
+    if not start_url:
+        raise HTTPException(status_code=400, detail="Crawl has no start_url")
+    parsed = urlparse(start_url)
+    return parsed.scheme or "https", parsed.netloc
+
+
+@router.get("/crawls/{crawl_id}/robots-txt")
+async def get_robots_txt(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+) -> dict:
+    """Fetch and parse robots.txt for the crawled domain."""
+    scheme, domain = await _get_crawl_domain(db, crawl_id)
+    robots_url = f"{scheme}://{domain}/robots.txt"
+
+    raw_content = ""
+    status_code = 0
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(robots_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                status_code = resp.status
+                if resp.status == 200:
+                    raw_content = await resp.text(errors="replace")
+    except Exception as e:
+        logger.debug("robots_txt_fetch_error", url=robots_url, error=str(e))
+
+    # Parse directives
+    directives: list[dict] = []
+    sitemaps: list[str] = []
+    current_agent = "*"
+
+    if raw_content:
+        for line in raw_content.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            match = re.match(r"^([\w-]+)\s*:\s*(.+)$", stripped, re.IGNORECASE)
+            if not match:
+                continue
+            key = match.group(1).lower()
+            value = match.group(2).strip()
+            if key == "user-agent":
+                current_agent = value
+            elif key == "sitemap":
+                sitemaps.append(value)
+            else:
+                directives.append({
+                    "user_agent": current_agent,
+                    "directive": key,
+                    "value": value,
+                })
+
+    return {
+        "url": robots_url,
+        "status_code": status_code,
+        "raw_content": raw_content,
+        "directives": directives,
+        "sitemaps": sitemaps,
+        "domain": domain,
+    }
+
+
+@router.get("/crawls/{crawl_id}/sitemap-analysis")
+async def get_sitemap_analysis(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+) -> dict:
+    """Discover and analyze sitemaps, compare with crawled URLs."""
+    scheme, domain = await _get_crawl_domain(db, crawl_id)
+
+    # Step 1: Discover sitemap URLs from robots.txt
+    sitemap_urls: list[str] = []
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{scheme}://{domain}/robots.txt",
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                if resp.status == 200:
+                    text = await resp.text(errors="replace")
+                    for line in text.splitlines():
+                        match = re.match(r"^sitemap\s*:\s*(.+)$", line.strip(), re.IGNORECASE)
+                        if match:
+                            sitemap_urls.append(match.group(1).strip())
+    except Exception:
+        pass
+
+    # Fallback: try common sitemap locations
+    if not sitemap_urls:
+        sitemap_urls = [f"{scheme}://{domain}/sitemap.xml"]
+
+    # Step 2: Fetch and parse sitemaps (with sitemap index support)
+    sitemap_entries: list[dict] = []
+    parsed_sitemaps: list[dict] = []
+
+    async def _fetch_sitemap(url: str, depth: int = 0) -> None:
+        if depth > 2:  # Prevent infinite recursion
+            return
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url, timeout=aiohttp.ClientTimeout(total=15)
+                ) as resp:
+                    if resp.status != 200:
+                        parsed_sitemaps.append({
+                            "url": url,
+                            "status_code": resp.status,
+                            "type": "error",
+                            "url_count": 0,
+                        })
+                        return
+                    content = await resp.text(errors="replace")
+        except Exception as e:
+            parsed_sitemaps.append({
+                "url": url,
+                "status_code": 0,
+                "type": "error",
+                "url_count": 0,
+                "error": str(e),
+            })
+            return
+
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            parsed_sitemaps.append({
+                "url": url,
+                "status_code": 200,
+                "type": "parse_error",
+                "url_count": 0,
+            })
+            return
+
+        ns = ""
+        tag = root.tag
+        if tag.startswith("{"):
+            ns = tag[: tag.index("}") + 1]
+
+        # Sitemap index
+        if root.tag == f"{ns}sitemapindex":
+            child_urls = []
+            for sitemap_el in root.findall(f"{ns}sitemap"):
+                loc_el = sitemap_el.find(f"{ns}loc")
+                if loc_el is not None and loc_el.text:
+                    child_urls.append(loc_el.text.strip())
+            parsed_sitemaps.append({
+                "url": url,
+                "status_code": 200,
+                "type": "index",
+                "url_count": len(child_urls),
+                "child_sitemaps": child_urls,
+            })
+            for child_url in child_urls[:10]:  # Limit to 10 child sitemaps
+                await _fetch_sitemap(child_url, depth + 1)
+        else:
+            # Regular urlset
+            urls_found = []
+            for url_el in root.findall(f"{ns}url"):
+                loc_el = url_el.find(f"{ns}loc")
+                lastmod_el = url_el.find(f"{ns}lastmod")
+                if loc_el is not None and loc_el.text:
+                    entry = {
+                        "url": loc_el.text.strip(),
+                        "lastmod": lastmod_el.text.strip() if lastmod_el is not None and lastmod_el.text else None,
+                    }
+                    urls_found.append(entry)
+                    sitemap_entries.append(entry)
+            parsed_sitemaps.append({
+                "url": url,
+                "status_code": 200,
+                "type": "urlset",
+                "url_count": len(urls_found),
+            })
+
+    for sm_url in sitemap_urls:
+        await _fetch_sitemap(sm_url)
+
+    # Step 3: Compare with crawled URLs
+    repo = UrlRepository(db)
+    crawled_urls_set: set[str] = set()
+    async for batch in repo.stream_for_sitemap(
+        crawl_id=crawl_id,
+        include_non_indexable=True,
+        include_non_200=True,
+    ):
+        for u in batch:
+            crawled_urls_set.add(u.url.rstrip("/"))
+
+    sitemap_urls_set = {e["url"].rstrip("/") for e in sitemap_entries}
+
+    in_sitemap_not_crawled = sorted(sitemap_urls_set - crawled_urls_set)
+    in_crawl_not_sitemap = sorted(crawled_urls_set - sitemap_urls_set)
+    in_both = sorted(sitemap_urls_set & crawled_urls_set)
+
+    return {
+        "domain": domain,
+        "sitemaps": parsed_sitemaps,
+        "total_sitemap_urls": len(sitemap_entries),
+        "total_crawled_urls": len(crawled_urls_set),
+        "coverage": {
+            "in_both": len(in_both),
+            "in_sitemap_not_crawled": len(in_sitemap_not_crawled),
+            "in_crawl_not_sitemap": len(in_crawl_not_sitemap),
+        },
+        "urls_in_sitemap_not_crawled": in_sitemap_not_crawled[:200],
+        "urls_in_crawl_not_sitemap": in_crawl_not_sitemap[:200],
+    }

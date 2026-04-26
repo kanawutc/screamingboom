@@ -152,6 +152,10 @@ export interface CrawledUrl {
   crawl_depth: number;
   response_time_ms: number | null;
   redirect_url: string | null;
+  link_score: number | null;
+  text_ratio: number | null;
+  readability_score: number | null;
+  avg_words_per_sentence: number | null;
   crawled_at: string;
 }
 

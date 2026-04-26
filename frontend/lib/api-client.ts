@@ -248,6 +248,14 @@ export const urlsApi = {
   hreflang: (crawlId: string, limit = 200) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any[]>(`/crawls/${crawlId}/hreflang${qs({ limit })}`),
+
+  robotsTxt: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/robots-txt`),
+
+  sitemapAnalysis: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/sitemap-analysis`),
 };
 
 export const extractionRulesApi = {

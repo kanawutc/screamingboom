@@ -13,7 +13,7 @@ import {
   Pause, Play, Square, Trash2, ArrowLeft, ExternalLink as ExternalLinkIcon, Globe,
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
   X, Download, Search, Link2, Shield, Navigation, FileCode2, Sheet, Braces,
-  FastForward, Network, Copy, Cookie, Lock, Languages, Timer,
+  FastForward, Network, Copy, Cookie, Lock, Languages, Timer, Bot, Map,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -33,7 +33,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "issues";
+type TabKey = "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "robots_txt" | "sitemaps" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -60,6 +60,8 @@ const TABS: TabDef[] = [
   { key: "hreflang", label: "Hreflang", icon: <Languages className="h-3 w-3" /> },
   { key: "links_analysis", label: "Links", icon: <Network className="h-3 w-3" /> },
   { key: "duplicates", label: "Duplicates", icon: <Copy className="h-3 w-3" /> },
+  { key: "robots_txt", label: "Robots.txt", icon: <Bot className="h-3 w-3" /> },
+  { key: "sitemaps", label: "Sitemaps", icon: <Map className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -180,6 +182,12 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   duplicates: [
     { label: "All", filter: {} },
   ],
+  robots_txt: [
+    { label: "All", filter: {} },
+  ],
+  sitemaps: [
+    { label: "All", filter: {} },
+  ],
   issues: [
     { label: "All", filter: {} },
     { label: "Critical", filter: { severity: "critical" } },
@@ -273,7 +281,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates",
+    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "robots_txt" && activeTab !== "sitemaps",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -384,6 +392,21 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryFn: () => urlsApi.duplicates(crawlId),
     enabled: !!crawl && activeTab === "duplicates" && isTerminal,
   });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: robotsTxtData, isLoading: robotsLoading } = useQuery<any>({
+    queryKey: ["crawl-robots-txt", crawlId],
+    queryFn: () => urlsApi.robotsTxt(crawlId),
+    enabled: !!crawl && activeTab === "robots_txt",
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sitemapData, isLoading: sitemapLoading } = useQuery<any>({
+    queryKey: ["crawl-sitemap-analysis", crawlId],
+    queryFn: () => urlsApi.sitemapAnalysis(crawlId),
+    enabled: !!crawl && activeTab === "sitemaps",
+  });
+
   const { data: issueSummary } = useQuery({
     queryKey: ["crawl-issues-summary", crawlId],
     queryFn: () => issuesApi.summary(crawlId),
@@ -617,6 +640,10 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <LinksAnalysisPanel data={linksAnalysisData} loading={linksLoading} isTerminal={isTerminal} linkScores={linkScoresData} />
             ) : activeTab === "duplicates" ? (
               <DuplicatesPanel data={duplicatesData} loading={duplicatesLoading} isTerminal={isTerminal} />
+            ) : activeTab === "robots_txt" ? (
+              <RobotsTxtPanel data={robotsTxtData} loading={robotsLoading} />
+            ) : activeTab === "sitemaps" ? (
+              <SitemapPanel data={sitemapData} loading={sitemapLoading} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -1917,6 +1944,182 @@ function HreflangPanel({ data, loading, isTerminal }: { data: any[] | undefined;
           )}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ─── Robots.txt Panel ─────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function RobotsTxtPanel({ data, loading }: { data: any | undefined; loading: boolean }) {
+  if (loading) return <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading robots.txt...</div>;
+  if (!data) return <div className="p-4 text-gray-400 text-sm">No data available</div>;
+
+  const directives = data.directives ?? [];
+  const sitemaps = data.sitemaps ?? [];
+  const agents: string[] = [...new Set<string>(directives.map((d: any) => String(d.user_agent)))];
+
+  return (
+    <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(100vh-280px)]">
+      {/* Summary cards */}
+      <div className="grid grid-cols-4 gap-3">
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">Status</div>
+          <div className={`text-lg font-bold ${data.status_code === 200 ? "text-green-700" : data.status_code === 404 ? "text-orange-600" : "text-red-600"}`}>
+            {data.status_code || "Error"}
+          </div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">User Agents</div>
+          <div className="text-lg font-bold text-gray-900">{agents.length}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">Directives</div>
+          <div className="text-lg font-bold text-gray-900">{directives.length}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">Sitemaps</div>
+          <div className="text-lg font-bold text-blue-700">{sitemaps.length}</div>
+        </div>
+      </div>
+
+      {/* Sitemaps listed in robots.txt */}
+      {sitemaps.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <h3 className="text-xs font-semibold text-gray-700 mb-2">Sitemaps declared in robots.txt</h3>
+          <div className="space-y-1">
+            {sitemaps.map((url: string, i: number) => (
+              <div key={i} className="text-xs text-blue-600 font-mono truncate">{url}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Directives by user-agent */}
+      {agents.map((agent: string) => (
+        <div key={agent} className="bg-white rounded-lg border border-gray-200 p-3">
+          <h3 className="text-xs font-semibold text-gray-700 mb-2">User-Agent: <span className="font-mono text-blue-700">{agent}</span></h3>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-100 text-gray-500">
+                <th className="text-left py-1 px-2 w-32">Directive</th>
+                <th className="text-left py-1 px-2">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {directives.filter((d: any) => d.user_agent === agent).map((d: any, i: number) => (
+                <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                  <td className={`py-1 px-2 font-mono ${d.directive === "disallow" ? "text-red-600" : d.directive === "allow" ? "text-green-700" : "text-gray-700"}`}>
+                    {d.directive}
+                  </td>
+                  <td className="py-1 px-2 font-mono text-gray-700">{d.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+
+      {/* Raw content */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <h3 className="text-xs font-semibold text-gray-700 mb-2">Raw Content — <span className="font-mono text-gray-500">{data.url}</span></h3>
+        <pre className="text-xs font-mono bg-gray-50 rounded p-3 overflow-x-auto whitespace-pre max-h-80 overflow-y-auto text-gray-700">
+          {data.raw_content || "(empty)"}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sitemap Panel ──────────���─────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function SitemapPanel({ data, loading }: { data: any | undefined; loading: boolean }) {
+  if (loading) return <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Analyzing sitemaps...</div>;
+  if (!data) return <div className="p-4 text-gray-400 text-sm">No data available</div>;
+
+  const sitemaps = data.sitemaps ?? [];
+  const coverage = data.coverage ?? {};
+
+  return (
+    <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(100vh-280px)]">
+      {/* Summary cards */}
+      <div className="grid grid-cols-4 gap-3">
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">Sitemap URLs</div>
+          <div className="text-lg font-bold text-gray-900">{data.total_sitemap_urls ?? 0}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">Crawled URLs</div>
+          <div className="text-lg font-bold text-gray-900">{data.total_crawled_urls ?? 0}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">In Both</div>
+          <div className="text-lg font-bold text-green-700">{coverage.in_both ?? 0}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">Coverage</div>
+          <div className="text-lg font-bold text-blue-700">
+            {data.total_sitemap_urls > 0 ? `${Math.round((coverage.in_both / data.total_sitemap_urls) * 100)}%` : "N/A"}
+          </div>
+        </div>
+      </div>
+
+      {/* Coverage breakdown */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-lg border border-orange-200 p-3">
+          <h3 className="text-xs font-semibold text-orange-700 mb-1">In Sitemap, Not Crawled ({coverage.in_sitemap_not_crawled ?? 0})</h3>
+          <p className="text-[10px] text-gray-500 mb-2">URLs in sitemap.xml that weren't found during crawl</p>
+          <div className="max-h-60 overflow-y-auto space-y-0.5">
+            {(data.urls_in_sitemap_not_crawled ?? []).slice(0, 100).map((url: string, i: number) => (
+              <div key={i} className="text-[11px] font-mono text-orange-700 truncate">{url}</div>
+            ))}
+            {(coverage.in_sitemap_not_crawled ?? 0) === 0 && (
+              <div className="text-[11px] text-gray-400 italic">All sitemap URLs were crawled</div>
+            )}
+          </div>
+        </div>
+        <div className="bg-white rounded-lg border border-blue-200 p-3">
+          <h3 className="text-xs font-semibold text-blue-700 mb-1">Crawled, Not in Sitemap ({coverage.in_crawl_not_sitemap ?? 0})</h3>
+          <p className="text-[10px] text-gray-500 mb-2">URLs found during crawl that aren't in sitemap.xml</p>
+          <div className="max-h-60 overflow-y-auto space-y-0.5">
+            {(data.urls_in_crawl_not_sitemap ?? []).slice(0, 100).map((url: string, i: number) => (
+              <div key={i} className="text-[11px] font-mono text-blue-700 truncate">{url}</div>
+            ))}
+            {(coverage.in_crawl_not_sitemap ?? 0) === 0 && (
+              <div className="text-[11px] text-gray-400 italic">All crawled URLs are in the sitemap</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Sitemap files */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <h3 className="text-xs font-semibold text-gray-700 mb-2">Discovered Sitemaps</h3>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-gray-100 text-gray-500">
+              <th className="text-left py-1 px-2">URL</th>
+              <th className="text-left py-1 px-2 w-20">Status</th>
+              <th className="text-left py-1 px-2 w-20">Type</th>
+              <th className="text-right py-1 px-2 w-20">URLs</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sitemaps.map((sm: any, i: number) => (
+              <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                <td className="py-1 px-2 font-mono text-blue-600 truncate max-w-md">{sm.url}</td>
+                <td className={`py-1 px-2 ${sm.status_code === 200 ? "text-green-700" : "text-red-600"}`}>
+                  {sm.status_code || "Err"}
+                </td>
+                <td className="py-1 px-2 text-gray-600">{sm.type}</td>
+                <td className="py-1 px-2 text-right text-gray-700">{sm.url_count}</td>
+              </tr>
+            ))}
+            {sitemaps.length === 0 && (
+              <tr><td colSpan={4} className="py-3 text-center text-gray-400 italic">No sitemaps found</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
