@@ -2019,3 +2019,145 @@ class UrlRepository:
                 "thin_count": stats_row.thin_count if stats_row else 0,
             },
         }
+
+    async def get_crawl_depth_analysis(
+        self, crawl_id: uuid.UUID
+    ) -> dict[str, Any]:
+        """Analyze crawl depth distribution and pages per depth level."""
+        s = self._session
+
+        sql = text("""
+            SELECT
+                crawl_depth,
+                COUNT(*) AS page_count,
+                SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) AS ok_count,
+                SUM(CASE WHEN is_indexable THEN 1 ELSE 0 END) AS indexable_count,
+                AVG(response_time_ms)::int AS avg_response_ms,
+                AVG(word_count)::int AS avg_words
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+            GROUP BY crawl_depth
+            ORDER BY crawl_depth
+        """)
+        result = await s.execute(sql, {"crawl_id": str(crawl_id)})
+        levels = [
+            {
+                "depth": r.crawl_depth,
+                "page_count": r.page_count,
+                "ok_count": r.ok_count,
+                "indexable_count": r.indexable_count,
+                "avg_response_ms": r.avg_response_ms or 0,
+                "avg_words": r.avg_words or 0,
+            }
+            for r in result.all()
+        ]
+
+        # Pages at each depth with details (limited)
+        detail_sql = text("""
+            SELECT
+                id, url, crawl_depth, status_code,
+                COALESCE(seo_data->>'title', '') AS title,
+                response_time_ms, word_count, is_indexable
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+            ORDER BY crawl_depth, url
+            LIMIT 500
+        """)
+        detail_result = await s.execute(detail_sql, {"crawl_id": str(crawl_id)})
+        pages = [
+            {
+                "url_id": str(r.id),
+                "url": r.url,
+                "depth": r.crawl_depth,
+                "status_code": r.status_code,
+                "title": r.title or "",
+                "response_time_ms": r.response_time_ms or 0,
+                "word_count": r.word_count or 0,
+                "is_indexable": r.is_indexable,
+            }
+            for r in detail_result.all()
+        ]
+
+        total = sum(l["page_count"] for l in levels)
+        max_depth = max((l["depth"] for l in levels), default=0)
+
+        return {
+            "levels": levels,
+            "pages": pages,
+            "stats": {
+                "total_pages": total,
+                "max_depth": max_depth,
+                "depth_levels": len(levels),
+            },
+        }
+
+    async def get_response_time_distribution(
+        self, crawl_id: uuid.UUID
+    ) -> dict[str, Any]:
+        """Get response time distribution for heatmap visualization."""
+        s = self._session
+
+        sql = text("""
+            SELECT
+                CASE
+                    WHEN response_time_ms IS NULL THEN 'unknown'
+                    WHEN response_time_ms < 100 THEN '<100ms'
+                    WHEN response_time_ms < 200 THEN '100-200ms'
+                    WHEN response_time_ms < 500 THEN '200-500ms'
+                    WHEN response_time_ms < 1000 THEN '500ms-1s'
+                    WHEN response_time_ms < 2000 THEN '1-2s'
+                    WHEN response_time_ms < 5000 THEN '2-5s'
+                    ELSE '5s+'
+                END AS bucket,
+                COUNT(*) AS count,
+                AVG(response_time_ms)::int AS avg_ms,
+                MIN(response_time_ms) AS min_ms,
+                MAX(response_time_ms) AS max_ms
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+            GROUP BY bucket
+            ORDER BY MIN(COALESCE(response_time_ms, 999999))
+        """)
+        result = await s.execute(sql, {"crawl_id": str(crawl_id)})
+        buckets = [
+            {
+                "bucket": r.bucket,
+                "count": r.count,
+                "avg_ms": r.avg_ms or 0,
+                "min_ms": r.min_ms,
+                "max_ms": r.max_ms,
+            }
+            for r in result.all()
+        ]
+
+        # Slowest pages
+        slow_sql = text("""
+            SELECT
+                id, url, response_time_ms, status_code,
+                COALESCE(seo_data->>'title', '') AS title
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND response_time_ms IS NOT NULL
+            ORDER BY response_time_ms DESC
+            LIMIT 20
+        """)
+        slow_result = await s.execute(slow_sql, {"crawl_id": str(crawl_id)})
+        slowest = [
+            {
+                "url_id": str(r.id),
+                "url": r.url,
+                "response_time_ms": r.response_time_ms,
+                "status_code": r.status_code,
+                "title": r.title or "",
+            }
+            for r in slow_result.all()
+        ]
+
+        return {
+            "distribution": buckets,
+            "slowest_pages": slowest,
+        }

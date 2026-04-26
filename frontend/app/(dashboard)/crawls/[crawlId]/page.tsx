@@ -14,7 +14,7 @@ import {
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
   X, Download, Search, Link2, Shield, Navigation, FileCode2, Sheet, Braces,
   FastForward, Network, Copy, Cookie, Lock, Languages, Timer, Bot, Map, LayoutDashboard, FolderTree,
-  ClipboardList, Unlink, BarChart3,
+  ClipboardList, Unlink, BarChart3, Layers, Gauge,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -34,7 +34,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "link_graph" | "orphan_pages" | "content_quality" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "link_graph" | "orphan_pages" | "content_quality" | "depth_analysis" | "response_times" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -72,6 +72,8 @@ const TABS: TabDef[] = [
   { key: "link_graph", label: "Link Graph", icon: <Network className="h-3 w-3" /> },
   { key: "orphan_pages", label: "Orphan Pages", icon: <Unlink className="h-3 w-3" /> },
   { key: "content_quality", label: "Content Quality", icon: <BarChart3 className="h-3 w-3" /> },
+  { key: "depth_analysis", label: "Crawl Depth", icon: <Layers className="h-3 w-3" /> },
+  { key: "response_times", label: "Response Times", icon: <Gauge className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -226,6 +228,12 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   content_quality: [
     { label: "All", filter: {} },
   ],
+  depth_analysis: [
+    { label: "All", filter: {} },
+  ],
+  response_times: [
+    { label: "All", filter: {} },
+  ],
   issues: [
     { label: "All", filter: {} },
     { label: "Critical", filter: { severity: "critical" } },
@@ -319,7 +327,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords" && activeTab !== "report" && activeTab !== "link_graph" && activeTab !== "orphan_pages" && activeTab !== "content_quality",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords" && activeTab !== "report" && activeTab !== "link_graph" && activeTab !== "orphan_pages" && activeTab !== "content_quality" && activeTab !== "depth_analysis" && activeTab !== "response_times",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -529,6 +537,20 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-content-quality", crawlId],
     queryFn: () => urlsApi.contentQuality(crawlId),
     enabled: !!crawl && activeTab === "content_quality" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: depthData, isLoading: depthLoading } = useQuery<any>({
+    queryKey: ["crawl-depth-analysis", crawlId],
+    queryFn: () => urlsApi.depthAnalysis(crawlId),
+    enabled: !!crawl && activeTab === "depth_analysis" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: responseTimesData, isLoading: responseTimesLoading } = useQuery<any>({
+    queryKey: ["crawl-response-times", crawlId],
+    queryFn: () => urlsApi.responseTimes(crawlId),
+    enabled: !!crawl && activeTab === "response_times" && isTerminal,
   });
 
   const { data: issueSummary } = useQuery({
@@ -788,6 +810,10 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <OrphanPagesPanel data={orphanData} loading={orphanLoading} isTerminal={isTerminal} />
             ) : activeTab === "content_quality" ? (
               <ContentQualityPanel data={contentQualityData} loading={contentQualityLoading} isTerminal={isTerminal} />
+            ) : activeTab === "depth_analysis" ? (
+              <DepthAnalysisPanel data={depthData} loading={depthLoading} isTerminal={isTerminal} />
+            ) : activeTab === "response_times" ? (
+              <ResponseTimesPanel data={responseTimesData} loading={responseTimesLoading} isTerminal={isTerminal} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -803,7 +829,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
                   <button onClick={() => setLogCursor(timelineData?.next_cursor)} disabled={!timelineData?.next_cursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
                 </div>
               </>
-            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" || activeTab === "link_graph" || activeTab === "orphan_pages" || activeTab === "content_quality" ? (
+            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" || activeTab === "link_graph" || activeTab === "orphan_pages" || activeTab === "content_quality" || activeTab === "depth_analysis" || activeTab === "response_times" ? (
               <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
             ) : activeTab === "issues" ? (
               <>
@@ -3004,6 +3030,193 @@ function KeywordsPanel({ data, loading, isTerminal }: { data: any | undefined; l
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── Depth Analysis Panel ────────────────────────────────────────────────
+function DepthAnalysisPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Depth analysis available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Analyzing crawl depth...</div>;
+  if (!data || !data.levels?.length) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No depth data</div>;
+
+  const { levels = [], pages = [], stats = {} } = data;
+  const maxCount = Math.max(...levels.map((l: any) => l.page_count), 1);
+  const depthColors = ["bg-blue-500", "bg-cyan-500", "bg-teal-500", "bg-emerald-500", "bg-amber-500", "bg-orange-500", "bg-red-500", "bg-rose-500"];
+
+  return (
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      {/* Stats */}
+      <div className="flex items-center gap-4 text-xs text-gray-600">
+        <span><strong>{stats.total_pages}</strong> HTML pages</span>
+        <span>Max depth: <strong>{stats.max_depth}</strong></span>
+        <span><strong>{stats.depth_levels}</strong> depth levels</span>
+      </div>
+
+      {stats.max_depth > 3 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+          Pages deeper than 3 clicks from the homepage may be harder for search engines to discover.
+          Consider flattening your site structure.
+        </div>
+      )}
+
+      {/* Depth distribution chart */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <h3 className="text-xs font-semibold text-gray-700 mb-3">Pages by Crawl Depth</h3>
+        <div className="space-y-2">
+          {levels.map((l: any, i: number) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-[10px] text-gray-500 w-16 text-right flex-shrink-0">Depth {l.depth}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-5 relative">
+                <div
+                  className={`h-5 rounded-full ${depthColors[Math.min(i, depthColors.length - 1)]} transition-all`}
+                  style={{ width: `${Math.max((l.page_count / maxCount) * 100, 3)}%` }}
+                />
+                <span className="absolute inset-y-0 flex items-center pl-2 text-[10px] font-medium text-white mix-blend-difference">
+                  {l.page_count} pages · {l.indexable_count} indexable · avg {l.avg_response_ms}ms
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Depth table */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-gray-50 z-10">
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="text-center py-1.5 px-2 w-16">Depth</th>
+              <th className="text-right py-1.5 px-2 w-16">Pages</th>
+              <th className="text-right py-1.5 px-2 w-16">OK</th>
+              <th className="text-right py-1.5 px-2 w-20">Indexable</th>
+              <th className="text-right py-1.5 px-2 w-20">Avg Speed</th>
+              <th className="text-right py-1.5 px-2 w-20">Avg Words</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {levels.map((l: any, i: number) => (
+              <tr key={i} className={`hover:bg-gray-50/50 ${l.depth > 3 ? "bg-amber-50/30" : ""}`}>
+                <td className="py-1.5 px-2 text-center">
+                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-[10px] font-bold ${depthColors[Math.min(i, depthColors.length - 1)]}`}>
+                    {l.depth}
+                  </span>
+                </td>
+                <td className="py-1.5 px-2 text-right font-mono">{l.page_count}</td>
+                <td className="py-1.5 px-2 text-right font-mono text-green-600">{l.ok_count}</td>
+                <td className="py-1.5 px-2 text-right font-mono">{l.indexable_count}</td>
+                <td className="py-1.5 px-2 text-right font-mono">
+                  <span className={l.avg_response_ms > 1000 ? "text-red-600" : l.avg_response_ms > 500 ? "text-amber-600" : "text-gray-600"}>
+                    {l.avg_response_ms}ms
+                  </span>
+                </td>
+                <td className="py-1.5 px-2 text-right font-mono text-gray-600">{l.avg_words}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Response Times Panel ───────────────────────────────────────────────
+function ResponseTimesPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Response times available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Analyzing response times...</div>;
+  if (!data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No response time data</div>;
+
+  const { distribution = [], slowest_pages = [] } = data;
+  const maxCount = Math.max(...distribution.map((d: any) => d.count), 1);
+  const bucketColors: Record<string, string> = {
+    "<100ms": "bg-emerald-500",
+    "100-200ms": "bg-green-500",
+    "200-500ms": "bg-blue-500",
+    "500ms-1s": "bg-amber-500",
+    "1-2s": "bg-orange-500",
+    "2-5s": "bg-red-500",
+    "5s+": "bg-red-700",
+    "unknown": "bg-gray-400",
+  };
+
+  return (
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      {/* Distribution chart */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <h3 className="text-xs font-semibold text-gray-700 mb-3">Response Time Distribution</h3>
+        <div className="space-y-2">
+          {distribution.map((d: any, i: number) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-[10px] text-gray-500 w-24 text-right flex-shrink-0">{d.bucket}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-5 relative">
+                <div
+                  className={`h-5 rounded-full ${bucketColors[d.bucket] || "bg-gray-400"} transition-all`}
+                  style={{ width: `${Math.max((d.count / maxCount) * 100, 3)}%` }}
+                />
+                <span className="absolute inset-y-0 flex items-center pl-2 text-[10px] font-medium text-white mix-blend-difference">
+                  {d.count} pages · avg {d.avg_ms}ms
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-3 text-[10px] text-gray-600 px-1">
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Fast (&lt;200ms)</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> OK (200-500ms)</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Slow (500ms-1s)</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Very Slow (&gt;1s)</span>
+      </div>
+
+      {/* Slowest pages */}
+      {slowest_pages.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200">
+          <div className="px-3 py-2 border-b border-gray-100">
+            <h3 className="text-xs font-semibold text-gray-700">Slowest Pages</h3>
+          </div>
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50">
+              <tr className="border-b border-gray-200 text-gray-500">
+                <th className="text-left py-1.5 px-2">#</th>
+                <th className="text-left py-1.5 px-2">URL</th>
+                <th className="text-left py-1.5 px-2 w-40">Title</th>
+                <th className="text-center py-1.5 px-2 w-16">Status</th>
+                <th className="text-right py-1.5 px-2 w-24">Response Time</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {slowest_pages.map((page: any, i: number) => (
+                <tr key={i} className="hover:bg-gray-50/50">
+                  <td className="py-1.5 px-2 text-gray-400">{i + 1}</td>
+                  <td className="py-1.5 px-2 text-blue-600 truncate max-w-md" title={page.url}>
+                    {truncateUrl(page.url, 50)}
+                  </td>
+                  <td className="py-1.5 px-2 text-gray-700 truncate max-w-[10rem]" title={page.title}>
+                    {page.title || <span className="text-gray-300 italic">No title</span>}
+                  </td>
+                  <td className="py-1.5 px-2 text-center">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                      page.status_code >= 200 && page.status_code < 300 ? "bg-green-50 text-green-700" :
+                      "bg-amber-50 text-amber-700"
+                    }`}>{page.status_code}</span>
+                  </td>
+                  <td className="py-1.5 px-2 text-right">
+                    <span className={`font-mono font-bold ${
+                      page.response_time_ms > 3000 ? "text-red-600" :
+                      page.response_time_ms > 1000 ? "text-orange-600" :
+                      "text-amber-600"
+                    }`}>
+                      {page.response_time_ms >= 1000 ? `${(page.response_time_ms / 1000).toFixed(1)}s` : `${page.response_time_ms}ms`}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -308,6 +308,14 @@ export const urlsApi = {
   contentQuality: (crawlId: string, limit = 200) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/content-quality${qs({ limit })}`),
+
+  depthAnalysis: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/depth-analysis`),
+
+  responseTimes: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/response-times`),
 };
 
 export const extractionRulesApi = {

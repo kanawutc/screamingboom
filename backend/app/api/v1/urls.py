@@ -740,6 +740,26 @@ async def get_link_graph(
     return await repo.get_link_graph(crawl_id, max_nodes=max_nodes)
 
 
+@router.get("/crawls/{crawl_id}/depth-analysis")
+async def get_depth_analysis(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+) -> dict:
+    """Analyze crawl depth distribution and pages per depth level."""
+    repo = UrlRepository(db)
+    return await repo.get_crawl_depth_analysis(crawl_id)
+
+
+@router.get("/crawls/{crawl_id}/response-times")
+async def get_response_time_distribution(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+) -> dict:
+    """Get response time distribution for heatmap visualization."""
+    repo = UrlRepository(db)
+    return await repo.get_response_time_distribution(crawl_id)
+
+
 @router.get("/crawls/{crawl_id}/orphan-pages")
 async def get_orphan_pages(
     crawl_id: uuid.UUID,
