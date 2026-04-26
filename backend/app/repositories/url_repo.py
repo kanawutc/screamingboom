@@ -1680,6 +1680,66 @@ class UrlRepository:
 
         return actions
 
+    async def get_top_keywords(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Extract top keywords from page titles and H1 headings."""
+        import re as _re
+        STOP_WORDS = {
+            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+            "of", "with", "by", "from", "as", "is", "was", "are", "were", "be",
+            "been", "being", "have", "has", "had", "do", "does", "did", "will",
+            "would", "could", "should", "may", "might", "shall", "can", "need",
+            "it", "its", "this", "that", "these", "those", "i", "you", "he", "she",
+            "we", "they", "me", "him", "her", "us", "them", "my", "your", "his",
+            "our", "their", "not", "no", "all", "each", "every", "both", "few",
+            "more", "most", "some", "any", "other", "such", "than", "too", "very",
+            "just", "about", "up", "out", "how", "what", "which", "who", "when",
+            "where", "why", "so", "if", "then", "also", "s", "t", "", "|", "-",
+        }
+
+        sql = text("""
+            SELECT title, h1
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND status_code BETWEEN 200 AND 299
+              AND content_type LIKE 'text/html%%'
+        """)
+        result = await self._session.execute(sql, {"crawl_id": str(crawl_id)})
+        rows = result.all()
+
+        word_freq: dict[str, int] = {}
+        for row in rows:
+            texts: list[str] = []
+            if row.title:
+                texts.append(row.title)
+            if row.h1 and isinstance(row.h1, list):
+                texts.extend(row.h1)
+            for text_str in texts:
+                words = _re.findall(r'[a-zA-Z0-9\u0E00-\u0E7F]+', text_str.lower())
+                for w in words:
+                    if w not in STOP_WORDS and len(w) > 1:
+                        word_freq[w] = word_freq.get(w, 0) + 1
+
+        # Sort by frequency, take top N
+        sorted_words = sorted(word_freq.items(), key=lambda x: -x[1])[:limit]
+        max_freq = sorted_words[0][1] if sorted_words else 1
+
+        return {
+            "keywords": [
+                {
+                    "word": w,
+                    "count": c,
+                    "weight": round(c / max_freq, 3),
+                }
+                for w, c in sorted_words
+            ],
+            "total_pages": len(rows),
+            "unique_words": len(word_freq),
+        }
+
     async def get_url_segments(
         self,
         crawl_id: uuid.UUID,

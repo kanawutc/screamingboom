@@ -288,6 +288,10 @@ export const urlsApi = {
   quickWins: (crawlId: string) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any[]>(`/crawls/${crawlId}/quick-wins`),
+
+  keywords: (crawlId: string, limit = 50) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/keywords${qs({ limit })}`),
 };
 
 export const extractionRulesApi = {

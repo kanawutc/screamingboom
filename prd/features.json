@@ -106,14 +106,13 @@
       "id": "1.9",
       "phase": 1,
       "name": "Include / Exclude URL Patterns",
-      "status": "partial",
+      "status": "done",
       "priority": "critical",
       "backend": true,
-      "frontend": false,
+      "frontend": true,
       "files_backend": ["crawler/engine.py"],
-      "files_frontend": [],
-      "depends_on": ["1.1"],
-      "notes": "Backend supports include/exclude in config JSONB. No frontend UI for pattern management."
+      "files_frontend": ["app/(dashboard)/crawls/new/page.tsx"],
+      "depends_on": ["1.1"]
     },
     {
       "id": "1.10",

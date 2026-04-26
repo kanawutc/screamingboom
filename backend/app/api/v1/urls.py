@@ -607,6 +607,17 @@ async def get_crawl_speed(
     return await repo.get_crawl_speed_chart(crawl_id)
 
 
+@router.get("/crawls/{crawl_id}/keywords")
+async def get_top_keywords(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(50, ge=1, le=200),
+) -> dict:
+    """Extract top keywords from page titles and H1 headings."""
+    repo = UrlRepository(db)
+    return await repo.get_top_keywords(crawl_id, limit=limit)
+
+
 @router.get("/crawls/{crawl_id}/quick-wins")
 async def get_quick_wins(
     crawl_id: uuid.UUID,

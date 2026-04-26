@@ -33,7 +33,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -66,6 +66,7 @@ const TABS: TabDef[] = [
   { key: "sitemaps", label: "Sitemaps", icon: <Map className="h-3 w-3" /> },
   { key: "crawl_log", label: "Crawl Log", icon: <FileText className="h-3 w-3" /> },
   { key: "segments", label: "Segments", icon: <Sheet className="h-3 w-3" /> },
+  { key: "keywords", label: "Keywords", icon: <Hash className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -205,6 +206,9 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   segments: [
     { label: "All", filter: {} },
   ],
+  keywords: [
+    { label: "All", filter: {} },
+  ],
   issues: [
     { label: "All", filter: {} },
     { label: "Critical", filter: { severity: "critical" } },
@@ -298,7 +302,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -473,6 +477,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-quick-wins", crawlId],
     queryFn: () => urlsApi.quickWins(crawlId),
     enabled: !!crawl && activeTab === "overview" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: keywordsData, isLoading: keywordsLoading } = useQuery<any>({
+    queryKey: ["crawl-keywords", crawlId],
+    queryFn: () => urlsApi.keywords(crawlId),
+    enabled: !!crawl && activeTab === "keywords" && isTerminal,
   });
 
   const { data: issueSummary } = useQuery({
@@ -722,6 +733,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <CrawlLogPanel data={timelineData} loading={timelineLoading} speedData={crawlSpeedData} onLoadMore={() => setLogCursor(timelineData?.next_cursor)} />
             ) : activeTab === "segments" ? (
               <SegmentsPanel data={segmentsData} loading={segmentsLoading} isTerminal={isTerminal} />
+            ) : activeTab === "keywords" ? (
+              <KeywordsPanel data={keywordsData} loading={keywordsLoading} isTerminal={isTerminal} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -737,7 +750,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
                   <button onClick={() => setLogCursor(timelineData?.next_cursor)} disabled={!timelineData?.next_cursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
                 </div>
               </>
-            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" ? (
+            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" ? (
               <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
             ) : activeTab === "issues" ? (
               <>
@@ -2866,6 +2879,78 @@ function CrawlLogPanel({ data, loading, speedData, onLoadMore }: { data: any | u
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Keywords Panel ─────────────────────────────────────────────────────
+function KeywordsPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Keywords available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Extracting keywords...</div>;
+  if (!data || !data.keywords || data.keywords.length === 0) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No keywords found</div>;
+
+  const keywords = data.keywords ?? [];
+
+  return (
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      {/* Stats */}
+      <div className="flex items-center gap-4 text-xs text-gray-600">
+        <span><strong>{data.total_pages}</strong> pages analyzed</span>
+        <span><strong>{data.unique_words}</strong> unique words</span>
+        <span>Showing top <strong>{keywords.length}</strong></span>
+      </div>
+
+      {/* Word Cloud */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h3 className="text-xs font-semibold text-gray-700 mb-3">Keyword Cloud</h3>
+        <div className="flex flex-wrap gap-2 justify-center py-4">
+          {keywords.slice(0, 40).map((kw: any, i: number) => {
+            const size = Math.max(11, Math.min(28, Math.round(kw.weight * 28)));
+            const colors = ["text-blue-700", "text-green-700", "text-purple-700", "text-amber-700", "text-rose-700", "text-teal-700", "text-indigo-700"];
+            return (
+              <span
+                key={i}
+                className={`inline-block ${colors[i % colors.length]} hover:opacity-70 cursor-default transition-opacity`}
+                style={{ fontSize: `${size}px`, fontWeight: kw.weight > 0.5 ? 700 : kw.weight > 0.2 ? 500 : 400 }}
+                title={`"${kw.word}" appears ${kw.count} times`}
+              >
+                {kw.word}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Keywords table */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-gray-50 z-10">
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="text-left py-1.5 px-2 w-8">#</th>
+              <th className="text-left py-1.5 px-2">Keyword</th>
+              <th className="text-right py-1.5 px-2 w-16">Count</th>
+              <th className="text-left py-1.5 px-2 w-48">Frequency</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {keywords.map((kw: any, i: number) => (
+              <tr key={i} className="hover:bg-gray-50/50">
+                <td className="py-1 px-2 text-gray-400">{i + 1}</td>
+                <td className="py-1 px-2 font-medium text-gray-800">{kw.word}</td>
+                <td className="py-1 px-2 text-right font-mono">{kw.count}</td>
+                <td className="py-1 px-2">
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div
+                      className="bg-blue-500 h-2 rounded-full transition-all"
+                      style={{ width: `${Math.max(kw.weight * 100, 2)}%` }}
+                    />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
