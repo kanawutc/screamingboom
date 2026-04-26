@@ -582,6 +582,17 @@ async def get_hreflang_data(
     return await repo.get_hreflang_data(crawl_id, limit=limit)
 
 
+@router.get("/crawls/{crawl_id}/images-audit")
+async def get_images_audit(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(500, ge=1, le=2000),
+) -> dict:
+    """Get images audit: alt text coverage, missing dimensions, per-page breakdown."""
+    repo = UrlRepository(db)
+    return await repo.get_images_audit(crawl_id, limit=limit)
+
+
 @router.get("/crawls/{crawl_id}/site-structure")
 async def get_site_structure(
     crawl_id: uuid.UUID,

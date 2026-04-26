@@ -1165,6 +1165,72 @@ class UrlRepository:
             "slowest_pages": slowest,
         }
 
+    async def get_images_audit(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 500,
+    ) -> dict:
+        """Get images audit: pages with images, alt text analysis."""
+        sql = text("""
+            SELECT id, url, seo_data->'images' AS images
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND seo_data->'images' IS NOT NULL
+              AND jsonb_array_length(seo_data->'images') > 0
+            ORDER BY jsonb_array_length(seo_data->'images') DESC
+            LIMIT :limit
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        pages = []
+        total_images = 0
+        missing_alt = 0
+        missing_dimensions = 0
+        all_images: list[dict] = []
+
+        for r in result.all():
+            imgs = r.images if isinstance(r.images, list) else []
+            page_missing_alt = sum(1 for i in imgs if not i.get("alt"))
+            page_images = []
+            for img in imgs:
+                total_images += 1
+                has_alt = bool(img.get("alt"))
+                has_dims = bool(img.get("width") and img.get("height"))
+                if not has_alt:
+                    missing_alt += 1
+                if not has_dims:
+                    missing_dimensions += 1
+                entry = {
+                    "src": img.get("src", ""),
+                    "alt": img.get("alt", ""),
+                    "width": img.get("width"),
+                    "height": img.get("height"),
+                    "has_alt": has_alt,
+                    "has_dimensions": has_dims,
+                }
+                page_images.append(entry)
+                all_images.append({**entry, "page_url": r.url})
+            pages.append({
+                "url_id": str(r.id),
+                "url": r.url,
+                "image_count": len(imgs),
+                "missing_alt_count": page_missing_alt,
+                "images": page_images,
+            })
+
+        return {
+            "summary": {
+                "total_images": total_images,
+                "pages_with_images": len(pages),
+                "missing_alt": missing_alt,
+                "missing_dimensions": missing_dimensions,
+                "alt_coverage": round((total_images - missing_alt) / total_images * 100, 1) if total_images > 0 else 100,
+            },
+            "pages": pages,
+            "images_missing_alt": [i for i in all_images if not i["has_alt"]][:100],
+        }
+
     async def get_site_structure(
         self,
         crawl_id: uuid.UUID,

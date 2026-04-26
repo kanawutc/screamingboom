@@ -127,9 +127,7 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
     { label: "All", filter: {} },
   ],
   images: [
-    { label: "All", filter: { content_type: "image/" } },
-    { label: "Missing Alt", filter: { has_issue: "missing_alt_text" } },
-    { label: "Alt Too Long", filter: { has_issue: "alt_text_too_long" } },
+    { label: "All", filter: {} },
   ],
   canonicals: [
     { label: "All", filter: {} },
@@ -289,7 +287,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -420,6 +418,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-site-structure", crawlId],
     queryFn: () => urlsApi.siteStructure(crawlId),
     enabled: !!crawl && activeTab === "site_structure",
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: imagesAuditData, isLoading: imagesLoading } = useQuery<any>({
+    queryKey: ["crawl-images-audit", crawlId],
+    queryFn: () => urlsApi.imagesAudit(crawlId),
+    enabled: !!crawl && activeTab === "images" && isTerminal,
   });
 
   const { data: issueSummary } = useQuery({
@@ -641,6 +646,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <PaginationAuditTable items={pagItems} loading={pagLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             ) : activeTab === "custom_search" ? (
               <CustomSearchTable items={csItems} loading={csLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
+            ) : activeTab === "images" ? (
+              <ImagesAuditPanel data={imagesAuditData} loading={imagesLoading} isTerminal={isTerminal} />
             ) : activeTab === "redirects" ? (
               <RedirectsPanel data={redirectsData} loading={redirectsLoading} isTerminal={isTerminal} />
             ) : activeTab === "content" ? (
@@ -2126,6 +2133,103 @@ function OverviewPanel({ crawl, crawledCount, errorCount, issueSummary, healthSc
           <div><span className="text-gray-500">Completed:</span> <span className="font-medium">{crawl.completed_at ? new Date(crawl.completed_at).toLocaleString() : "—"}</span></div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Images Audit Panel ──────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ImagesAuditPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Images audit available after crawl completes.</div>;
+  if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Auditing images...</div>;
+  if (!data) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">No image data available.</div>;
+
+  const summary = data.summary ?? {};
+  const pages = data.pages ?? [];
+  const missingAlt = data.images_missing_alt ?? [];
+
+  return (
+    <div className="overflow-auto max-h-[calc(100vh-280px)]">
+      {/* Summary cards */}
+      <div className="flex gap-3 p-3 border-b border-gray-200">
+        <div className="flex-1 p-2 bg-blue-50 rounded border border-blue-200 text-center">
+          <div className="text-[10px] text-blue-500 uppercase tracking-wide">Total Images</div>
+          <div className="text-lg font-bold text-blue-700">{summary.total_images ?? 0}</div>
+        </div>
+        <div className="flex-1 p-2 bg-green-50 rounded border border-green-200 text-center">
+          <div className="text-[10px] text-green-500 uppercase tracking-wide">Pages with Images</div>
+          <div className="text-lg font-bold text-green-700">{summary.pages_with_images ?? 0}</div>
+        </div>
+        <div className="flex-1 p-2 bg-red-50 rounded border border-red-200 text-center">
+          <div className="text-[10px] text-red-500 uppercase tracking-wide">Missing Alt</div>
+          <div className="text-lg font-bold text-red-700">{summary.missing_alt ?? 0}</div>
+        </div>
+        <div className="flex-1 p-2 bg-amber-50 rounded border border-amber-200 text-center">
+          <div className="text-[10px] text-amber-500 uppercase tracking-wide">No Dimensions</div>
+          <div className="text-lg font-bold text-amber-700">{summary.missing_dimensions ?? 0}</div>
+        </div>
+        <div className="flex-1 p-2 bg-purple-50 rounded border border-purple-200 text-center">
+          <div className="text-[10px] text-purple-500 uppercase tracking-wide">Alt Coverage</div>
+          <div className={`text-lg font-bold ${(summary.alt_coverage ?? 100) >= 90 ? "text-green-700" : (summary.alt_coverage ?? 100) >= 70 ? "text-amber-700" : "text-red-700"}`}>{summary.alt_coverage ?? 100}%</div>
+        </div>
+      </div>
+
+      {/* Missing alt images */}
+      {missingAlt.length > 0 && (
+        <div className="p-3 border-b border-gray-200">
+          <h3 className="text-[10px] font-bold text-red-600 uppercase tracking-wide mb-2">Images Missing Alt Text ({missingAlt.length})</h3>
+          <table className="w-full text-[11px]">
+            <thead className="bg-red-50">
+              <tr className="text-left text-[10px] text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-1 font-medium">Image URL</th>
+                <th className="px-2 py-1 font-medium">Page</th>
+                <th className="px-2 py-1 font-medium w-20">Dimensions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {missingAlt.slice(0, 50).map((img: any, i: number) => (
+                <tr key={i} className="border-t border-gray-100 hover:bg-red-50/30">
+                  <td className="px-2 py-1 font-mono truncate max-w-[300px] text-blue-600" title={img.src}>{truncateUrl(img.src, 50)}</td>
+                  <td className="px-2 py-1 truncate max-w-[300px] text-gray-600" title={img.page_url}>{truncateUrl(img.page_url, 40)}</td>
+                  <td className="px-2 py-1 text-gray-500">{img.width && img.height ? `${img.width}×${img.height}` : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Per-page breakdown */}
+      <table className="w-full text-[11px]">
+        <thead className="bg-gray-50 sticky top-0">
+          <tr className="text-left text-[10px] text-gray-500 uppercase tracking-wider">
+            <th className="px-3 py-1.5 font-medium">Page URL</th>
+            <th className="px-3 py-1.5 font-medium text-right w-24">Images</th>
+            <th className="px-3 py-1.5 font-medium text-right w-24">Missing Alt</th>
+            <th className="px-3 py-1.5 font-medium w-32">Alt Coverage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pages.map((page: any, i: number) => {
+            const coverage = page.image_count > 0 ? Math.round(((page.image_count - page.missing_alt_count) / page.image_count) * 100) : 100;
+            return (
+              <tr key={i} className={`border-t border-gray-100 hover:bg-blue-50/40 ${page.missing_alt_count > 0 ? "bg-red-50/20" : ""}`}>
+                <td className="px-3 py-1.5 truncate max-w-[400px]" title={page.url}>{truncateUrl(page.url, 60)}</td>
+                <td className="px-3 py-1.5 text-right font-mono text-gray-700">{page.image_count}</td>
+                <td className={`px-3 py-1.5 text-right font-mono ${page.missing_alt_count > 0 ? "text-red-600 font-medium" : "text-gray-500"}`}>{page.missing_alt_count}</td>
+                <td className="px-3 py-1.5">
+                  <div className="flex items-center gap-1">
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${coverage >= 90 ? "bg-green-400" : coverage >= 50 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${coverage}%` }} />
+                    </div>
+                    <span className="text-[10px] text-gray-500 w-8 text-right">{coverage}%</span>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

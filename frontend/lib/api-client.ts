@@ -260,6 +260,10 @@ export const urlsApi = {
   siteStructure: (crawlId: string, maxNodes = 500) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/site-structure${qs({ max_nodes: maxNodes })}`),
+
+  imagesAudit: (crawlId: string, limit = 500) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/images-audit${qs({ limit })}`),
 };
 
 export const extractionRulesApi = {
