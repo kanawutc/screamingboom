@@ -1165,6 +1165,81 @@ class UrlRepository:
             "slowest_pages": slowest,
         }
 
+    async def get_overview_stats(
+        self,
+        crawl_id: uuid.UUID,
+    ) -> dict:
+        """Get comprehensive overview stats for the Overview tab."""
+        # Status code distribution
+        status_sql = text("""
+            SELECT
+                CASE
+                    WHEN status_code BETWEEN 200 AND 299 THEN '2xx'
+                    WHEN status_code BETWEEN 300 AND 399 THEN '3xx'
+                    WHEN status_code BETWEEN 400 AND 499 THEN '4xx'
+                    WHEN status_code BETWEEN 500 AND 599 THEN '5xx'
+                    ELSE 'other'
+                END AS group_name,
+                COUNT(*) AS cnt
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id AND status_code IS NOT NULL
+            GROUP BY group_name
+            ORDER BY group_name
+        """)
+        status_result = await self._session.execute(
+            status_sql, {"crawl_id": str(crawl_id)}
+        )
+        status_dist = {r.group_name: r.cnt for r in status_result.all()}
+
+        # Content type distribution
+        ct_sql = text("""
+            SELECT
+                CASE
+                    WHEN content_type LIKE 'text/html%' THEN 'HTML'
+                    WHEN content_type LIKE '%javascript%' THEN 'JavaScript'
+                    WHEN content_type LIKE 'text/css%' THEN 'CSS'
+                    WHEN content_type LIKE 'image/%' THEN 'Images'
+                    WHEN content_type LIKE '%json%' THEN 'JSON'
+                    WHEN content_type LIKE '%xml%' THEN 'XML'
+                    WHEN content_type LIKE '%pdf%' THEN 'PDF'
+                    WHEN content_type LIKE '%font%' THEN 'Fonts'
+                    ELSE 'Other'
+                END AS type_name,
+                COUNT(*) AS cnt
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id AND content_type IS NOT NULL
+            GROUP BY type_name
+            ORDER BY cnt DESC
+        """)
+        ct_result = await self._session.execute(
+            ct_sql, {"crawl_id": str(crawl_id)}
+        )
+        content_type_dist = [{"type": r.type_name, "count": r.cnt} for r in ct_result.all()]
+
+        # Indexability
+        idx_sql = text("""
+            SELECT
+                COUNT(*) FILTER (WHERE is_indexable = true) AS indexable,
+                COUNT(*) FILTER (WHERE is_indexable = false) AS non_indexable,
+                COUNT(*) AS total
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+        """)
+        idx_result = await self._session.execute(
+            idx_sql, {"crawl_id": str(crawl_id)}
+        )
+        idx = idx_result.one()
+
+        return {
+            "status_code_distribution": status_dist,
+            "content_type_distribution": content_type_dist,
+            "indexability": {
+                "indexable": idx.indexable,
+                "non_indexable": idx.non_indexable,
+                "total": idx.total,
+            },
+        }
+
     async def get_images_audit(
         self,
         crawl_id: uuid.UUID,

@@ -264,6 +264,10 @@ export const urlsApi = {
   imagesAudit: (crawlId: string, limit = 500) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/images-audit${qs({ limit })}`),
+
+  overviewStats: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/overview-stats`),
 };
 
 export const extractionRulesApi = {

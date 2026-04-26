@@ -400,6 +400,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: overviewStatsData } = useQuery<any>({
+    queryKey: ["crawl-overview-stats", crawlId],
+    queryFn: () => urlsApi.overviewStats(crawlId),
+    enabled: !!crawl && activeTab === "overview" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: robotsTxtData, isLoading: robotsLoading } = useQuery<any>({
     queryKey: ["crawl-robots-txt", crawlId],
     queryFn: () => urlsApi.robotsTxt(crawlId),
@@ -633,7 +640,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-auto">
             {activeTab === "overview" ? (
-              <OverviewPanel crawl={crawl} crawledCount={crawledCount} errorCount={errorCount} issueSummary={issueSummary} healthScore={healthScore} perfData={perfData} urlsPerSec={urlsPerSec} elapsed={elapsed} isTerminal={isTerminal} />
+              <OverviewPanel crawl={crawl} crawledCount={crawledCount} errorCount={errorCount} issueSummary={issueSummary} healthScore={healthScore} perfData={perfData} urlsPerSec={urlsPerSec} elapsed={elapsed} isTerminal={isTerminal} overviewStats={overviewStatsData} />
             ) : activeTab === "issues" ? (
               <IssuesTable issues={issues} loading={issuesLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             ) : activeTab === "external" ? (
@@ -2001,10 +2008,10 @@ function HreflangPanel({ data, loading, isTerminal }: { data: any[] | undefined;
 
 // ─── Overview Panel ───────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function OverviewPanel({ crawl, crawledCount, errorCount, issueSummary, healthScore, perfData, urlsPerSec, elapsed, isTerminal }: {
+function OverviewPanel({ crawl, crawledCount, errorCount, issueSummary, healthScore, perfData, urlsPerSec, elapsed, isTerminal, overviewStats }: {
   crawl: Crawl; crawledCount: number; errorCount: number;
   issueSummary: any; healthScore: any; perfData: any;
-  urlsPerSec: number | null; elapsed: number | null; isTerminal: boolean;
+  urlsPerSec: number | null; elapsed: number | null; isTerminal: boolean; overviewStats?: any;
 }) {
   const config = crawl.config as Record<string, any>;
   const score = healthScore?.score ?? null;
@@ -2109,6 +2116,80 @@ function OverviewPanel({ crawl, crawledCount, errorCount, issueSummary, healthSc
           </div>
         )}
       </div>
+
+      {/* Distribution charts */}
+      {overviewStats && (
+        <div className="grid grid-cols-3 gap-3">
+          {/* Status code distribution */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 className="text-xs font-semibold text-gray-700 mb-3">Status Codes</h3>
+            <div className="space-y-2">
+              {[
+                { key: "2xx", label: "2xx Success", color: "bg-green-500", textColor: "text-green-700" },
+                { key: "3xx", label: "3xx Redirect", color: "bg-blue-500", textColor: "text-blue-700" },
+                { key: "4xx", label: "4xx Client Error", color: "bg-orange-500", textColor: "text-orange-700" },
+                { key: "5xx", label: "5xx Server Error", color: "bg-red-500", textColor: "text-red-700" },
+              ].map(({ key, label, color, textColor }) => {
+                const count = overviewStats.status_code_distribution?.[key] ?? 0;
+                const pct = crawledCount > 0 ? (count / crawledCount) * 100 : 0;
+                return (
+                  <div key={key}>
+                    <div className="flex justify-between text-[11px] mb-0.5">
+                      <span className="text-gray-600">{label}</span>
+                      <span className={`font-medium ${textColor}`}>{count} ({pct.toFixed(0)}%)</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Content type distribution */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 className="text-xs font-semibold text-gray-700 mb-3">Content Types</h3>
+            <div className="space-y-1.5">
+              {(overviewStats.content_type_distribution ?? []).slice(0, 8).map((ct: any, i: number) => {
+                const pct = crawledCount > 0 ? (ct.count / crawledCount) * 100 : 0;
+                return (
+                  <div key={i} className="flex justify-between text-[11px]">
+                    <span className="text-gray-600">{ct.type}</span>
+                    <span className="font-medium text-gray-800">{ct.count} <span className="text-gray-400">({pct.toFixed(0)}%)</span></span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Indexability */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 className="text-xs font-semibold text-gray-700 mb-3">Indexability</h3>
+            {overviewStats.indexability && (() => {
+              const { indexable, non_indexable, total } = overviewStats.indexability;
+              const pct = total > 0 ? (indexable / total) * 100 : 0;
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center">
+                    <div className="text-center">
+                      <div className={`text-3xl font-bold ${pct >= 90 ? "text-green-700" : pct >= 70 ? "text-amber-700" : "text-red-700"}`}>{pct.toFixed(0)}%</div>
+                      <div className="text-[10px] text-gray-500">Indexable</div>
+                    </div>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-green-500" style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-green-700">Indexable: {indexable}</span>
+                    <span className="text-red-600">Non-indexable: {non_indexable}</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Crawl config summary */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">

@@ -582,6 +582,16 @@ async def get_hreflang_data(
     return await repo.get_hreflang_data(crawl_id, limit=limit)
 
 
+@router.get("/crawls/{crawl_id}/overview-stats")
+async def get_overview_stats(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+) -> dict:
+    """Get comprehensive overview stats: status code dist, content type dist, indexability."""
+    repo = UrlRepository(db)
+    return await repo.get_overview_stats(crawl_id)
+
+
 @router.get("/crawls/{crawl_id}/images-audit")
 async def get_images_audit(
     crawl_id: uuid.UUID,
