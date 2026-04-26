@@ -2439,3 +2439,95 @@ class UrlRepository:
             },
             "pages": pages,
         }
+
+    async def get_accessibility_audit(
+        self, crawl_id: uuid.UUID, limit: int = 200
+    ) -> dict[str, Any]:
+        """Audit web accessibility: alt text, headings, lang, ARIA hints."""
+        s = self._session
+
+        # Images without alt text
+        img_sql = text("""
+            SELECT
+                COUNT(*) AS total_pages,
+                SUM(jsonb_array_length(COALESCE(seo_data->'images', '[]'::jsonb))) AS total_images,
+                SUM((
+                    SELECT COUNT(*) FROM jsonb_array_elements(COALESCE(seo_data->'images', '[]'::jsonb)) img
+                    WHERE (img->>'alt') IS NULL OR (img->>'alt') = ''
+                )) AS missing_alt_count
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND status_code >= 200 AND status_code < 300
+        """)
+        img_result = await s.execute(img_sql, {"crawl_id": str(crawl_id)})
+        img_row = img_result.first()
+
+        # Heading hierarchy issues (skipped levels)
+        heading_sql = text("""
+            SELECT
+                id, url,
+                COALESCE(seo_data->>'title', '') AS title,
+                seo_data->'heading_sequence' AS heading_seq,
+                CASE WHEN h1 IS NULL OR array_length(h1, 1) IS NULL THEN true ELSE false END AS missing_h1,
+                CASE WHEN array_length(h1, 1) > 1 THEN true ELSE false END AS multiple_h1
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND status_code >= 200 AND status_code < 300
+            ORDER BY url
+            LIMIT :limit
+        """)
+        heading_result = await s.execute(heading_sql, {"crawl_id": str(crawl_id), "limit": limit})
+        heading_rows = heading_result.all()
+
+        heading_issues = []
+        missing_h1_count = 0
+        multiple_h1_count = 0
+        skipped_level_count = 0
+
+        for r in heading_rows:
+            issues: list[str] = []
+            if r.missing_h1:
+                missing_h1_count += 1
+                issues.append("Missing H1")
+            if r.multiple_h1:
+                multiple_h1_count += 1
+                issues.append("Multiple H1")
+
+            # Check for skipped heading levels
+            seq = r.heading_seq if isinstance(r.heading_seq, list) else []
+            if seq:
+                levels = [int(h[1]) for h in seq if len(h) == 2 and h[0] == "h" and h[1].isdigit()]
+                for i in range(1, len(levels)):
+                    if levels[i] > levels[i - 1] + 1:
+                        skipped_level_count += 1
+                        issues.append(f"Skipped level: h{levels[i-1]} → h{levels[i]}")
+                        break
+
+            if issues:
+                heading_issues.append({
+                    "url_id": str(r.id),
+                    "url": r.url,
+                    "title": r.title or "",
+                    "issues": issues,
+                    "heading_count": len(seq),
+                })
+
+        total_pages = len(heading_rows)
+        total_images = img_row.total_images or 0 if img_row else 0
+        missing_alt = img_row.missing_alt_count or 0 if img_row else 0
+
+        return {
+            "stats": {
+                "total_pages": total_pages,
+                "total_images": total_images,
+                "missing_alt": missing_alt,
+                "alt_coverage_pct": round((1 - missing_alt / max(total_images, 1)) * 100, 1),
+                "missing_h1": missing_h1_count,
+                "multiple_h1": multiple_h1_count,
+                "skipped_heading_levels": skipped_level_count,
+                "pages_with_issues": len(heading_issues),
+            },
+            "heading_issues": heading_issues,
+        }

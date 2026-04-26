@@ -332,6 +332,10 @@ export const urlsApi = {
   mobileAudit: (crawlId: string, limit = 200) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/mobile-audit${qs({ limit })}`),
+
+  accessibilityAudit: (crawlId: string, limit = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/accessibility${qs({ limit })}`),
 };
 
 export const extractionRulesApi = {

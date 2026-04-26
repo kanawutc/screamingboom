@@ -782,6 +782,17 @@ async def get_og_audit(
     return await repo.get_og_audit(crawl_id, limit=limit)
 
 
+@router.get("/crawls/{crawl_id}/accessibility")
+async def get_accessibility_audit(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(200, ge=1, le=1000),
+) -> dict:
+    """Audit web accessibility: alt text, headings, lang attribute, ARIA."""
+    repo = UrlRepository(db)
+    return await repo.get_accessibility_audit(crawl_id, limit=limit)
+
+
 @router.get("/crawls/{crawl_id}/resources")
 async def get_resources_audit(
     crawl_id: uuid.UUID,

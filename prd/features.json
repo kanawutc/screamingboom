@@ -984,15 +984,16 @@
       "id": "5.7",
       "phase": 5,
       "name": "Segments",
-      "status": "planned",
+      "status": "done",
       "priority": "nice-to-have",
-      "backend": false,
-      "frontend": false,
+      "backend": true,
+      "frontend": true,
       "files_backend": [],
       "files_frontend": [],
       "depends_on": [
         "1.1"
-      ]
+      ],
+      "notes": "URL segments tab with auto-detected path groups, per-segment stats, distribution chart"
     },
     {
       "id": "6.1",
