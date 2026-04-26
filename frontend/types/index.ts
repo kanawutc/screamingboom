@@ -76,6 +76,11 @@ export interface CrawlConfig {
   url_rewrites: { pattern: string; replacement: string }[];
   strip_query_params: string[];
   render_js: boolean;
+  auth_type?: string | null;
+  auth_username?: string | null;
+  auth_password?: string | null;
+  auth_token?: string | null;
+  custom_headers?: Record<string, string>;
 }
 
 export const DEFAULT_CRAWL_CONFIG: CrawlConfig = {
@@ -90,6 +95,11 @@ export const DEFAULT_CRAWL_CONFIG: CrawlConfig = {
   url_rewrites: [],
   strip_query_params: [],
   render_js: false,
+  auth_type: null,
+  auth_username: null,
+  auth_password: null,
+  auth_token: null,
+  custom_headers: {},
 };
 
 // ─── Crawl ───────────────────────────────────────────────────────────

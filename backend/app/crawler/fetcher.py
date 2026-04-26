@@ -49,12 +49,22 @@ class FetcherPool:
         max_per_host: int = 2,
         request_timeout: int = 30,
         verify_ssl: bool = True,
+        auth_type: str | None = None,
+        auth_username: str | None = None,
+        auth_password: str | None = None,
+        auth_token: str | None = None,
+        custom_headers: dict[str, str] | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._max_connections = max_connections
         self._max_per_host = max_per_host
         self._request_timeout = request_timeout
         self._verify_ssl = verify_ssl
+        self._auth_type = auth_type
+        self._auth_username = auth_username
+        self._auth_password = auth_password
+        self._auth_token = auth_token
+        self._custom_headers = custom_headers or {}
         self._session: aiohttp.ClientSession | None = None
         self._connector: aiohttp.TCPConnector | None = None
 
@@ -74,10 +84,22 @@ class FetcherPool:
             connect=10,
             sock_read=20,
         )
+        # Build auth
+        auth = None
+        if self._auth_type == "basic" and self._auth_username:
+            auth = aiohttp.BasicAuth(self._auth_username, self._auth_password or "")
+
+        # Build headers
+        session_headers: dict[str, str] = {"User-Agent": self._user_agent}
+        if self._auth_type == "bearer" and self._auth_token:
+            session_headers["Authorization"] = f"Bearer {self._auth_token}"
+        session_headers.update(self._custom_headers)
+
         self._session = aiohttp.ClientSession(
             connector=self._connector,
             timeout=timeout,
-            headers={"User-Agent": self._user_agent},
+            headers=session_headers,
+            auth=auth,
         )
         logger.info(
             "Fetcher pool started",

@@ -136,6 +136,11 @@ async def start_crawl_job(ctx: dict, crawl_id: str) -> dict:
         mode=crawl_mode,
         urls=db_config.get("urls", []),
         extraction_rules=extraction_rules,
+        auth_type=db_config.get("auth_type"),
+        auth_username=db_config.get("auth_username"),
+        auth_password=db_config.get("auth_password"),
+        auth_token=db_config.get("auth_token"),
+        custom_headers=db_config.get("custom_headers", {}),
     )
 
     # Listen for control commands (pause/resume/stop) via Redis pub/sub

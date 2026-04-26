@@ -44,6 +44,11 @@ class CrawlConfig(BaseModel):
     url_rewrites: list[dict] = Field(default_factory=list)
     strip_query_params: list[str] = Field(default_factory=list)
     render_js: bool = False
+    auth_type: str | None = Field(default=None, description="Authentication type: 'basic', 'bearer', or None")
+    auth_username: str | None = Field(default=None, max_length=255)
+    auth_password: str | None = Field(default=None, max_length=255)
+    auth_token: str | None = Field(default=None, max_length=2000, description="Bearer token")
+    custom_headers: dict[str, str] = Field(default_factory=dict, description="Custom HTTP headers")
 
 
 class CrawlCreate(BaseModel):

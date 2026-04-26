@@ -64,6 +64,11 @@ class CrawlConfig:
     strip_query_params: list[str] = field(default_factory=list)
     render_js: bool = False
     max_connections: int = 0
+    auth_type: str | None = None
+    auth_username: str | None = None
+    auth_password: str | None = None
+    auth_token: str | None = None
+    custom_headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -204,6 +209,11 @@ class CrawlEngine:
                 max_connections=self._config.max_connections,
                 max_per_host=self._config.max_per_host,
                 request_timeout=self._config.request_timeout,
+                auth_type=self._config.auth_type,
+                auth_username=self._config.auth_username,
+                auth_password=self._config.auth_password,
+                auth_token=self._config.auth_token,
+                custom_headers=self._config.custom_headers,
             )
 
         try:

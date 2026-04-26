@@ -64,6 +64,11 @@ class CrawlService:
             "url_rewrites": data.config.url_rewrites,
             "strip_query_params": data.config.strip_query_params,
             "render_js": data.config.render_js,
+            "auth_type": data.config.auth_type,
+            "auth_username": data.config.auth_username,
+            "auth_password": data.config.auth_password,
+            "auth_token": data.config.auth_token,
+            "custom_headers": data.config.custom_headers,
         }
 
         if data.mode == "list" and data.urls:

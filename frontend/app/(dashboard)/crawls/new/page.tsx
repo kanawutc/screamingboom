@@ -451,6 +451,48 @@ export default function NewCrawlPage() {
               Respect robots.txt
             </label>
           </div>
+
+          {/* Authentication */}
+          <div className="border-t pt-4">
+            <label className="text-sm font-medium mb-2 block">
+              Authentication (optional)
+            </label>
+            <Select
+              value={config.auth_type || "none"}
+              onValueChange={(v) => updateConfig({ auth_type: v === "none" ? null : v })}
+            >
+              <SelectTrigger className="mb-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Authentication</SelectItem>
+                <SelectItem value="basic">HTTP Basic Auth</SelectItem>
+                <SelectItem value="bearer">Bearer Token</SelectItem>
+              </SelectContent>
+            </Select>
+            {config.auth_type === "basic" && (
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  placeholder="Username"
+                  value={config.auth_username || ""}
+                  onChange={(e) => updateConfig({ auth_username: e.target.value || null })}
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={config.auth_password || ""}
+                  onChange={(e) => updateConfig({ auth_password: e.target.value || null })}
+                />
+              </div>
+            )}
+            {config.auth_type === "bearer" && (
+              <Input
+                placeholder="Bearer token"
+                value={config.auth_token || ""}
+                onChange={(e) => updateConfig({ auth_token: e.target.value || null })}
+              />
+            )}
+          </div>
         </CardContent>
       </Card>
 
