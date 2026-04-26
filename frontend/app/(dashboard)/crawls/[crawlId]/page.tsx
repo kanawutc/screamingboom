@@ -816,15 +816,59 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
 function UrlTable({ urls, loading, activeTab, selectedUrlId, onRowClick, crawlActive }: {
   urls: CrawledUrl[]; loading: boolean; activeTab: TabKey; selectedUrlId: string | null; onRowClick: (url: CrawledUrl) => void; crawlActive: boolean;
 }) {
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
   if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Loading URLs...</div>;
   if (urls.length === 0) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">{crawlActive ? "Crawl in progress \u2014 URLs will appear shortly..." : "No URLs found matching filters."}</div>;
 
   const columns = getColumnsForTab(activeTab);
+
+  const sortedUrls = useMemo(() => {
+    if (!sortKey) return urls;
+    const sorted = [...urls].sort((a, b) => {
+      const getVal = (u: CrawledUrl) => {
+        switch (sortKey) {
+          case "address": return u.url;
+          case "status": return u.status_code ?? 0;
+          case "content_type": return u.content_type ?? "";
+          case "title": return u.title ?? "";
+          case "title_len": return u.title_length ?? 0;
+          case "title_px": return u.title_pixel_width ?? 0;
+          case "meta_desc": return u.meta_description ?? "";
+          case "meta_desc_len": return u.meta_desc_length ?? 0;
+          case "h1_val": return u.h1?.[0] ?? "";
+          case "h2_val": return u.h2?.[0] ?? "";
+          case "canonical": return u.canonical_url ?? "";
+          case "indexable": return u.is_indexable ? 1 : 0;
+          case "depth": return u.crawl_depth;
+          case "word_count": return u.word_count ?? 0;
+          case "response_time": return u.response_time_ms ?? 0;
+          case "link_score": return u.link_score ?? 0;
+          default: return 0;
+        }
+      };
+      const va = getVal(a), vb = getVal(b);
+      if (typeof va === "string" && typeof vb === "string") return va.localeCompare(vb);
+      return (va as number) - (vb as number);
+    });
+    return sortDir === "desc" ? sorted.reverse() : sorted;
+  }, [urls, sortKey, sortDir]);
+
+  function handleSort(key: string) {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+  }
+
   return (
     <table className="sf-table w-full">
-      <thead><tr>{columns.map((col) => <th key={col.key} className={col.align === "right" ? "text-right" : "text-left"} style={col.width ? { width: col.width } : undefined}>{col.label}</th>)}</tr></thead>
+      <thead><tr>{columns.map((col) => (
+        <th key={col.key} className={`${col.align === "right" ? "text-right" : "text-left"} cursor-pointer hover:bg-gray-100 select-none`} style={col.width ? { width: col.width } : undefined} onClick={() => handleSort(col.key)}>
+          {col.label}{sortKey === col.key ? (sortDir === "asc" ? " \u25B2" : " \u25BC") : ""}
+        </th>
+      ))}</tr></thead>
       <tbody>
-        {urls.map((url) => (
+        {sortedUrls.map((url) => (
           <tr key={url.id} className={`cursor-pointer ${selectedUrlId === url.id ? "selected" : ""}`} onClick={() => onRowClick(url)}>
             {columns.map((col) => <td key={col.key} className={col.align === "right" ? "text-right" : ""}>{col.render(url)}</td>)}
           </tr>
