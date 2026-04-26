@@ -14,6 +14,7 @@ import {
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
   X, Download, Search, Link2, Shield, Navigation, FileCode2, Sheet, Braces,
   FastForward, Network, Copy, Cookie, Lock, Languages, Timer, Bot, Map, LayoutDashboard, FolderTree,
+  ClipboardList,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -33,7 +34,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -67,6 +68,7 @@ const TABS: TabDef[] = [
   { key: "crawl_log", label: "Crawl Log", icon: <FileText className="h-3 w-3" /> },
   { key: "segments", label: "Segments", icon: <Sheet className="h-3 w-3" /> },
   { key: "keywords", label: "Keywords", icon: <Hash className="h-3 w-3" /> },
+  { key: "report", label: "Report", icon: <ClipboardList className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -209,6 +211,9 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   keywords: [
     { label: "All", filter: {} },
   ],
+  report: [
+    { label: "All", filter: {} },
+  ],
   issues: [
     { label: "All", filter: {} },
     { label: "Critical", filter: { severity: "critical" } },
@@ -302,7 +307,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords" && activeTab !== "report",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -484,6 +489,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-keywords", crawlId],
     queryFn: () => urlsApi.keywords(crawlId),
     enabled: !!crawl && activeTab === "keywords" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: reportData, isLoading: reportLoading } = useQuery<any>({
+    queryKey: ["crawl-report", crawlId],
+    queryFn: () => urlsApi.summaryReport(crawlId),
+    enabled: !!crawl && activeTab === "report" && isTerminal,
   });
 
   const { data: issueSummary } = useQuery({
@@ -735,6 +747,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <SegmentsPanel data={segmentsData} loading={segmentsLoading} isTerminal={isTerminal} />
             ) : activeTab === "keywords" ? (
               <KeywordsPanel data={keywordsData} loading={keywordsLoading} isTerminal={isTerminal} />
+            ) : activeTab === "report" ? (
+              <ReportPanel data={reportData} loading={reportLoading} isTerminal={isTerminal} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -750,7 +764,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
                   <button onClick={() => setLogCursor(timelineData?.next_cursor)} disabled={!timelineData?.next_cursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
                 </div>
               </>
-            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" ? (
+            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" ? (
               <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
             ) : activeTab === "issues" ? (
               <>
@@ -2951,6 +2965,129 @@ function KeywordsPanel({ data, loading, isTerminal }: { data: any | undefined; l
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── Report Panel ───────────────────────────────────────────────────────
+function ReportPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Report available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Generating report...</div>;
+  if (!data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No report data</div>;
+
+  const gradeColors: Record<string, string> = {
+    "A+": "text-emerald-600 bg-emerald-50 border-emerald-200",
+    "A": "text-emerald-600 bg-emerald-50 border-emerald-200",
+    "B": "text-blue-600 bg-blue-50 border-blue-200",
+    "C": "text-amber-600 bg-amber-50 border-amber-200",
+    "D": "text-orange-600 bg-orange-50 border-orange-200",
+    "F": "text-red-600 bg-red-50 border-red-200",
+  };
+  const gradeClass = gradeColors[data.health_grade] || "text-gray-600 bg-gray-50 border-gray-200";
+
+  const sectionIcons: Record<string, string> = {
+    "SEO Health Score": "🏥",
+    "Crawl Overview": "🕷️",
+    "Issues Found": "⚠️",
+    "Recommended Actions": "🎯",
+    "Performance": "⚡",
+  };
+
+  const handleExportText = () => {
+    let text = `SEO CRAWL REPORT\n${"=".repeat(50)}\n`;
+    text += `Generated: ${new Date(data.generated_at).toLocaleString()}\n`;
+    text += `Health Score: ${data.health_score}/100 (Grade ${data.health_grade})\n\n`;
+    for (const section of data.sections) {
+      text += `${section.title}\n${"-".repeat(30)}\n`;
+      text += `${section.content}\n`;
+      if (section.details) {
+        for (const d of section.details) text += `  • ${d}\n`;
+      }
+      text += "\n";
+    }
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `seo-report-${data.crawl_id.slice(0, 8)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="p-4 space-y-4 overflow-y-auto h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className={`text-3xl font-bold px-4 py-2 rounded-lg border ${gradeClass}`}>
+            {data.health_grade}
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">SEO Crawl Report</h2>
+            <p className="text-xs text-gray-500">
+              Generated {new Date(data.generated_at).toLocaleString()} · Score: {data.health_score}/100
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleExportText}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Export
+        </button>
+      </div>
+
+      {/* Score Bar */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <div className="flex items-center justify-between text-xs text-gray-600 mb-1.5">
+          <span>Overall Health</span>
+          <span className="font-semibold">{data.health_score}/100</span>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-3">
+          <div
+            className={`h-3 rounded-full transition-all ${
+              data.health_score >= 80 ? "bg-emerald-500" :
+              data.health_score >= 60 ? "bg-blue-500" :
+              data.health_score >= 40 ? "bg-amber-500" :
+              "bg-red-500"
+            }`}
+            style={{ width: `${data.health_score}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Sections */}
+      {data.sections?.map((section: any, i: number) => (
+        <div key={i} className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base">{sectionIcons[section.title] || "📋"}</span>
+            <h3 className="text-sm font-semibold text-gray-800">{section.title}</h3>
+          </div>
+          <p className="text-sm text-gray-700 mb-2">{section.content}</p>
+          {section.details && section.details.length > 0 && (
+            <ul className="space-y-1">
+              {section.details.map((detail: string, j: number) => {
+                const isPriority = detail.startsWith("[HIGH]") || detail.startsWith("[CRITICAL]");
+                const isMedium = detail.startsWith("[MEDIUM]");
+                return (
+                  <li
+                    key={j}
+                    className={`text-xs flex items-start gap-1.5 ${
+                      isPriority ? "text-red-700" : isMedium ? "text-amber-700" : "text-gray-600"
+                    }`}
+                  >
+                    <span className="mt-0.5 flex-shrink-0">
+                      {isPriority ? "🔴" : isMedium ? "🟡" : "•"}
+                    </span>
+                    <span>{detail}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

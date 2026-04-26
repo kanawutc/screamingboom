@@ -292,6 +292,10 @@ export const urlsApi = {
   keywords: (crawlId: string, limit = 50) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/keywords${qs({ limit })}`),
+
+  summaryReport: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/summary-report`),
 };
 
 export const extractionRulesApi = {
