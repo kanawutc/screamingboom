@@ -81,6 +81,7 @@ export interface CrawlConfig {
   auth_password?: string | null;
   auth_token?: string | null;
   custom_headers?: Record<string, string>;
+  cdn_domains?: string[];
 }
 
 export const DEFAULT_CRAWL_CONFIG: CrawlConfig = {
@@ -100,6 +101,7 @@ export const DEFAULT_CRAWL_CONFIG: CrawlConfig = {
   auth_password: null,
   auth_token: null,
   custom_headers: {},
+  cdn_domains: [],
 };
 
 // ─── Crawl ───────────────────────────────────────────────────────────

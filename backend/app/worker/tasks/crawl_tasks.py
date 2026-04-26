@@ -141,6 +141,7 @@ async def start_crawl_job(ctx: dict, crawl_id: str) -> dict:
         auth_password=db_config.get("auth_password"),
         auth_token=db_config.get("auth_token"),
         custom_headers=db_config.get("custom_headers", {}),
+        cdn_domains=db_config.get("cdn_domains", []),
     )
 
     # Listen for control commands (pause/resume/stop) via Redis pub/sub

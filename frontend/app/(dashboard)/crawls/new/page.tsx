@@ -570,6 +570,28 @@ export default function NewCrawlPage() {
             </p>
           </div>
 
+          {/* CDN Domains */}
+          <div>
+            <label className="text-sm font-medium mb-1 block">
+              CDN Domains (treated as internal)
+            </label>
+            <Input
+              placeholder="cdn.example.com, assets.example.com (comma-separated)"
+              value={(config.cdn_domains ?? []).join(", ")}
+              onChange={(e) =>
+                updateConfig({
+                  cdn_domains: e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter((s) => s.length > 0),
+                })
+              }
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Links to these hostnames will be classified as internal and followed during crawl.
+            </p>
+          </div>
+
           {/* URL Rewriting */}
           <div>
             <div className="flex items-center justify-between mb-1">

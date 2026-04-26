@@ -49,6 +49,7 @@ class CrawlConfig(BaseModel):
     auth_password: str | None = Field(default=None, max_length=255)
     auth_token: str | None = Field(default=None, max_length=2000, description="Bearer token")
     custom_headers: dict[str, str] = Field(default_factory=dict, description="Custom HTTP headers")
+    cdn_domains: list[str] = Field(default_factory=list, description="CDN hostnames treated as internal")
 
 
 class CrawlCreate(BaseModel):

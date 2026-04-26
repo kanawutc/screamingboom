@@ -69,6 +69,7 @@ class CrawlService:
             "auth_password": data.config.auth_password,
             "auth_token": data.config.auth_token,
             "custom_headers": data.config.custom_headers,
+            "cdn_domains": data.config.cdn_domains,
         }
 
         if data.mode == "list" and data.urls:

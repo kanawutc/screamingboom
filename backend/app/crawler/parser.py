@@ -159,6 +159,7 @@ class ParserPool:
         content_type_header: str | None = None,
         custom_extractors: list[dict] | None = None,
         custom_searches: list[dict] | None = None,
+        cdn_domains: list[str] | None = None,
     ) -> PageData:
         """Parse HTML and extract all SEO-relevant data.
 
@@ -189,7 +190,7 @@ class ParserPool:
         self._extract_robots_meta(tree, data)
         self._extract_canonical(tree, data, base_url)
         self._extract_headings(tree, data)
-        self._extract_links(tree, data, base_url, base_domain)
+        self._extract_links(tree, data, base_url, base_domain, cdn_domains=cdn_domains)
         self._extract_images(tree, data, base_url)
         self._extract_hreflang(tree, data, base_url)
         self._extract_pagination(tree, data, base_url)
@@ -340,8 +341,10 @@ class ParserPool:
         data: PageData,
         base_url: str,
         base_domain: str,
+        cdn_domains: list[str] | None = None,
     ) -> None:
         """6. Extract all <a href> links with classification."""
+        cdn_set = {d.lower() for d in (cdn_domains or [])}
         for node in tree.css("a[href]"):
             href = node.attributes.get("href", "")
             if not href:
@@ -358,9 +361,13 @@ class ParserPool:
             rel_str = node.attributes.get("rel", "")
             rel_attrs = [r.strip().lower() for r in rel_str.split() if r.strip()] if rel_str else []
 
-            # Classify link type
+            # Classify link type (CDN domains treated as internal)
             link_domain = extract_domain(resolved)
-            if link_domain == base_domain or link_domain.endswith(f".{base_domain}"):
+            if (
+                link_domain == base_domain
+                or link_domain.endswith(f".{base_domain}")
+                or link_domain in cdn_set
+            ):
                 link_type = "internal"
             else:
                 link_type = "external"

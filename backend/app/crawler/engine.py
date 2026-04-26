@@ -69,6 +69,7 @@ class CrawlConfig:
     auth_password: str | None = None
     auth_token: str | None = None
     custom_headers: dict[str, str] = field(default_factory=dict)
+    cdn_domains: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -461,6 +462,7 @@ class CrawlEngine:
                         content_type_header=result.content_type,
                         custom_extractors=self._custom_extractors,
                         custom_searches=self._custom_searches,
+                        cdn_domains=self._config.cdn_domains,
                     )
                 except Exception as e:
                     logger.warning("parse_error", url=result.final_url, error=str(e))
@@ -549,10 +551,12 @@ class CrawlEngine:
         if not link_domain:
             return False
 
-        # Domain check
-        domain_ok = (link_domain == self._base_domain) or (
-            self._config.follow_subdomains
-            and link_domain.endswith(f".{self._base_domain}")
+        # Domain check — includes CDN domains as internal
+        cdn_domains = {d.lower() for d in self._config.cdn_domains}
+        domain_ok = (
+            (link_domain == self._base_domain)
+            or (self._config.follow_subdomains and link_domain.endswith(f".{self._base_domain}"))
+            or (link_domain in cdn_domains)
         )
         if not domain_ok:
             return False

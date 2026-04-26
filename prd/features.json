@@ -193,15 +193,25 @@
       "id": "1.11",
       "phase": 1,
       "name": "CDN Configuration",
-      "status": "planned",
+      "status": "done",
       "priority": "critical",
-      "backend": false,
-      "frontend": false,
-      "files_backend": [],
-      "files_frontend": [],
+      "backend": true,
+      "frontend": true,
+      "files_backend": [
+        "app/schemas/crawl.py",
+        "app/crawler/engine.py",
+        "app/crawler/parser.py",
+        "app/services/crawl_service.py",
+        "app/worker/tasks/crawl_tasks.py"
+      ],
+      "files_frontend": [
+        "app/(dashboard)/crawls/new/page.tsx",
+        "types/index.ts"
+      ],
       "depends_on": [
         "1.1"
-      ]
+      ],
+      "notes": "CDN domains configurable per crawl. Links to CDN hostnames classified as internal in both parser and engine scope check."
     },
     {
       "id": "1.12",
