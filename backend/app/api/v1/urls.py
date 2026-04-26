@@ -582,6 +582,17 @@ async def get_hreflang_data(
     return await repo.get_hreflang_data(crawl_id, limit=limit)
 
 
+@router.get("/crawls/{crawl_id}/heading-hierarchy")
+async def get_heading_hierarchy(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(200, ge=1, le=1000),
+) -> list[dict]:
+    """Get heading hierarchy analysis: sequence, skip-level detection."""
+    repo = UrlRepository(db)
+    return await repo.get_heading_hierarchy(crawl_id, limit=limit)
+
+
 @router.get("/crawls/{crawl_id}/overview-stats")
 async def get_overview_stats(
     crawl_id: uuid.UUID,

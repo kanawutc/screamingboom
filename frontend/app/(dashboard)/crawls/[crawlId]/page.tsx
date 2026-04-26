@@ -1275,6 +1275,14 @@ function BottomDetailPanel({ crawlId, urlId, detail, onClose }: { crawlId: strin
             <span className="text-gray-400 font-medium">Meta Description</span><span className="text-gray-700">{detail.meta_description ?? "\u2014"} {detail.meta_desc_length != null && <span className="text-gray-400 ml-1">({detail.meta_desc_length} chars)</span>}</span>
             <span className="text-gray-400 font-medium">H1</span><span className="text-gray-700">{detail.h1?.join(" | ") ?? "\u2014"}</span>
             <span className="text-gray-400 font-medium">H2</span><span className="text-gray-700">{detail.h2?.join(" | ") ?? "\u2014"}</span>
+            {seoData.heading_sequence && Array.isArray(seoData.heading_sequence) && (seoData.heading_sequence as string[]).length > 0 ? (
+              <><span className="text-gray-400 font-medium">Heading Hierarchy</span>
+                <div className="flex flex-wrap gap-0.5">{(seoData.heading_sequence as string[]).map((h: string, i: number) => {
+                  const level = parseInt(h.charAt(1)) || 1;
+                  const colors = ["", "bg-blue-100 text-blue-800", "bg-green-100 text-green-800", "bg-yellow-100 text-yellow-800", "bg-orange-100 text-orange-800", "bg-red-100 text-red-800", "bg-purple-100 text-purple-800"];
+                  return <span key={i} className={`px-1 py-0.5 rounded text-[9px] font-mono ${colors[level] ?? "bg-gray-100"}`} style={{ marginLeft: `${(level - 1) * 6}px` }}>{h.toUpperCase()}</span>;
+                })}</div></>
+            ) : null}
             <span className="text-gray-400 font-medium">Robots Meta</span><span className="text-gray-700">{detail.robots_meta?.join(", ") ?? "\u2014"}</span>
             {seoData.og && typeof seoData.og === "object" && !Array.isArray(seoData.og) ? (<><span className="text-gray-400 font-medium">Open Graph</span><span className="text-gray-700">{Object.entries(seoData.og as Record<string, string>).map(([k, v]) => `${k}: ${v}`).join(" | ") || "\u2014"}</span></>) : null}
             {seoData.hreflang && Array.isArray(seoData.hreflang) && (seoData.hreflang as { lang: string; href: string }[]).length > 0 ? (

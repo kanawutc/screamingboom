@@ -1165,6 +1165,50 @@ class UrlRepository:
             "slowest_pages": slowest,
         }
 
+    async def get_heading_hierarchy(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 200,
+    ) -> list[dict]:
+        """Get heading hierarchy analysis per page."""
+        sql = text("""
+            SELECT id, url, h1, h2,
+                   seo_data->'heading_sequence' AS heading_sequence
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND content_type LIKE 'text/html%'
+              AND status_code BETWEEN 200 AND 299
+            ORDER BY url
+            LIMIT :limit
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        pages = []
+        for r in result.all():
+            seq = r.heading_sequence if isinstance(r.heading_sequence, list) else []
+            # Detect hierarchy issues
+            issues = []
+            prev_level = 0
+            for tag in seq:
+                level = int(tag[1]) if len(tag) == 2 and tag[0] == "h" and tag[1].isdigit() else 0
+                if level > 0 and prev_level > 0 and level > prev_level + 1:
+                    issues.append(f"Skipped from {tag.upper()} after H{prev_level} (jumped {level - prev_level} levels)")
+                if level > 0:
+                    prev_level = level
+
+            pages.append({
+                "url_id": str(r.id),
+                "url": r.url,
+                "h1": r.h1 or [],
+                "h2": r.h2 or [],
+                "heading_sequence": seq,
+                "heading_count": len(seq),
+                "has_hierarchy_issues": len(issues) > 0,
+                "issues": issues,
+            })
+        return pages
+
     async def get_overview_stats(
         self,
         crawl_id: uuid.UUID,

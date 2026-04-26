@@ -268,6 +268,10 @@ export const urlsApi = {
   overviewStats: (crawlId: string) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/overview-stats`),
+
+  headingHierarchy: (crawlId: string, limit = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any[]>(`/crawls/${crawlId}/heading-hierarchy${qs({ limit })}`),
 };
 
 export const extractionRulesApi = {
