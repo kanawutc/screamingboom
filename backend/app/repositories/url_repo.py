@@ -2161,3 +2161,152 @@ class UrlRepository:
             "distribution": buckets,
             "slowest_pages": slowest,
         }
+
+    async def get_readability_analysis(
+        self, crawl_id: uuid.UUID, limit: int = 200
+    ) -> dict[str, Any]:
+        """Analyze readability scores, text ratio, and sentence complexity."""
+        s = self._session
+
+        stats_sql = text("""
+            SELECT
+                COUNT(*) AS total,
+                AVG((seo_data->>'text_ratio')::float)::numeric(5,2) AS avg_text_ratio,
+                AVG((seo_data->>'readability_score')::float)::numeric(5,1) AS avg_readability,
+                AVG((seo_data->>'avg_words_per_sentence')::float)::numeric(5,1) AS avg_sentence_len
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND status_code >= 200 AND status_code < 300
+                AND seo_data->>'text_ratio' IS NOT NULL
+        """)
+        stats_result = await s.execute(stats_sql, {"crawl_id": str(crawl_id)})
+        sr = stats_result.first()
+
+        # Text ratio distribution
+        ratio_sql = text("""
+            SELECT
+                CASE
+                    WHEN (seo_data->>'text_ratio')::float < 0.1 THEN '<10%'
+                    WHEN (seo_data->>'text_ratio')::float < 0.2 THEN '10-20%'
+                    WHEN (seo_data->>'text_ratio')::float < 0.3 THEN '20-30%'
+                    WHEN (seo_data->>'text_ratio')::float < 0.5 THEN '30-50%'
+                    ELSE '50%+'
+                END AS bucket,
+                COUNT(*) AS count
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND status_code >= 200 AND status_code < 300
+                AND seo_data->>'text_ratio' IS NOT NULL
+            GROUP BY bucket
+            ORDER BY MIN((seo_data->>'text_ratio')::float)
+        """)
+        ratio_result = await s.execute(ratio_sql, {"crawl_id": str(crawl_id)})
+        ratio_dist = [{"bucket": r.bucket, "count": r.count} for r in ratio_result.all()]
+
+        # Pages with readability data
+        pages_sql = text("""
+            SELECT
+                id, url,
+                COALESCE(seo_data->>'title', '') AS title,
+                (seo_data->>'text_ratio')::float AS text_ratio,
+                (seo_data->>'readability_score')::float AS readability_score,
+                (seo_data->>'avg_words_per_sentence')::float AS avg_sentence_len,
+                word_count
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND status_code >= 200 AND status_code < 300
+                AND seo_data->>'readability_score' IS NOT NULL
+            ORDER BY (seo_data->>'readability_score')::float ASC
+            LIMIT :limit
+        """)
+        pages_result = await s.execute(pages_sql, {"crawl_id": str(crawl_id), "limit": limit})
+        pages = [
+            {
+                "url_id": str(r.id),
+                "url": r.url,
+                "title": r.title or "",
+                "text_ratio": round(float(r.text_ratio or 0), 3),
+                "readability_score": round(float(r.readability_score or 0), 1),
+                "avg_sentence_len": round(float(r.avg_sentence_len or 0), 1),
+                "word_count": r.word_count or 0,
+            }
+            for r in pages_result.all()
+        ]
+
+        return {
+            "stats": {
+                "total_pages": sr.total if sr else 0,
+                "avg_text_ratio": float(sr.avg_text_ratio) if sr and sr.avg_text_ratio else 0,
+                "avg_readability": float(sr.avg_readability) if sr and sr.avg_readability else 0,
+                "avg_sentence_len": float(sr.avg_sentence_len) if sr and sr.avg_sentence_len else 0,
+            },
+            "text_ratio_distribution": ratio_dist,
+            "pages": pages,
+        }
+
+    async def get_og_audit(
+        self, crawl_id: uuid.UUID, limit: int = 200
+    ) -> dict[str, Any]:
+        """Audit Open Graph and social media meta tags."""
+        s = self._session
+
+        sql = text("""
+            SELECT
+                id, url,
+                COALESCE(seo_data->>'title', '') AS title,
+                seo_data->'og' AS og_data,
+                CASE WHEN seo_data->'og' IS NOT NULL AND seo_data->'og' != 'null'::jsonb THEN true ELSE false END AS has_og
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND status_code >= 200 AND status_code < 300
+            ORDER BY url
+            LIMIT :limit
+        """)
+        result = await s.execute(sql, {"crawl_id": str(crawl_id), "limit": limit})
+        rows = result.all()
+
+        pages = []
+        has_og_count = 0
+        missing_og_title = 0
+        missing_og_desc = 0
+        missing_og_image = 0
+
+        for r in rows:
+            og = r.og_data if isinstance(r.og_data, dict) else {}
+            has_og = bool(og)
+            if has_og:
+                has_og_count += 1
+            if not og.get("og:title"):
+                missing_og_title += 1
+            if not og.get("og:description"):
+                missing_og_desc += 1
+            if not og.get("og:image"):
+                missing_og_image += 1
+
+            pages.append({
+                "url_id": str(r.id),
+                "url": r.url,
+                "title": r.title or "",
+                "has_og": has_og,
+                "og_title": og.get("og:title", ""),
+                "og_description": og.get("og:description", ""),
+                "og_image": og.get("og:image", ""),
+                "og_type": og.get("og:type", ""),
+            })
+
+        total = len(rows)
+        return {
+            "stats": {
+                "total_pages": total,
+                "has_og": has_og_count,
+                "missing_og": total - has_og_count,
+                "missing_og_title": missing_og_title,
+                "missing_og_description": missing_og_desc,
+                "missing_og_image": missing_og_image,
+            },
+            "pages": pages,
+        }

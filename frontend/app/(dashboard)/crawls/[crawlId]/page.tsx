@@ -14,7 +14,7 @@ import {
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
   X, Download, Search, Link2, Shield, Navigation, FileCode2, Sheet, Braces,
   FastForward, Network, Copy, Cookie, Lock, Languages, Timer, Bot, Map, LayoutDashboard, FolderTree,
-  ClipboardList, Unlink, BarChart3, Layers, Gauge,
+  ClipboardList, Unlink, BarChart3, Layers, Gauge, BookOpen, Share2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -34,7 +34,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "link_graph" | "orphan_pages" | "content_quality" | "depth_analysis" | "response_times" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "link_graph" | "orphan_pages" | "content_quality" | "depth_analysis" | "response_times" | "readability" | "og_audit" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -74,6 +74,8 @@ const TABS: TabDef[] = [
   { key: "content_quality", label: "Content Quality", icon: <BarChart3 className="h-3 w-3" /> },
   { key: "depth_analysis", label: "Crawl Depth", icon: <Layers className="h-3 w-3" /> },
   { key: "response_times", label: "Response Times", icon: <Gauge className="h-3 w-3" /> },
+  { key: "readability", label: "Readability", icon: <BookOpen className="h-3 w-3" /> },
+  { key: "og_audit", label: "Open Graph", icon: <Share2 className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -234,6 +236,12 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   response_times: [
     { label: "All", filter: {} },
   ],
+  readability: [
+    { label: "All", filter: {} },
+  ],
+  og_audit: [
+    { label: "All", filter: {} },
+  ],
   issues: [
     { label: "All", filter: {} },
     { label: "Critical", filter: { severity: "critical" } },
@@ -327,7 +335,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords" && activeTab !== "report" && activeTab !== "link_graph" && activeTab !== "orphan_pages" && activeTab !== "content_quality" && activeTab !== "depth_analysis" && activeTab !== "response_times",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords" && activeTab !== "report" && activeTab !== "link_graph" && activeTab !== "orphan_pages" && activeTab !== "content_quality" && activeTab !== "depth_analysis" && activeTab !== "response_times" && activeTab !== "readability" && activeTab !== "og_audit",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -551,6 +559,20 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-response-times", crawlId],
     queryFn: () => urlsApi.responseTimes(crawlId),
     enabled: !!crawl && activeTab === "response_times" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: readabilityData, isLoading: readabilityLoading } = useQuery<any>({
+    queryKey: ["crawl-readability", crawlId],
+    queryFn: () => urlsApi.readability(crawlId),
+    enabled: !!crawl && activeTab === "readability" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: ogData2, isLoading: ogLoading } = useQuery<any>({
+    queryKey: ["crawl-og-audit", crawlId],
+    queryFn: () => urlsApi.ogAudit(crawlId),
+    enabled: !!crawl && activeTab === "og_audit" && isTerminal,
   });
 
   const { data: issueSummary } = useQuery({
@@ -814,6 +836,10 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <DepthAnalysisPanel data={depthData} loading={depthLoading} isTerminal={isTerminal} />
             ) : activeTab === "response_times" ? (
               <ResponseTimesPanel data={responseTimesData} loading={responseTimesLoading} isTerminal={isTerminal} />
+            ) : activeTab === "readability" ? (
+              <ReadabilityPanel data={readabilityData} loading={readabilityLoading} isTerminal={isTerminal} />
+            ) : activeTab === "og_audit" ? (
+              <OgAuditPanel data={ogData2} loading={ogLoading} isTerminal={isTerminal} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -829,7 +855,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
                   <button onClick={() => setLogCursor(timelineData?.next_cursor)} disabled={!timelineData?.next_cursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
                 </div>
               </>
-            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" || activeTab === "link_graph" || activeTab === "orphan_pages" || activeTab === "content_quality" || activeTab === "depth_analysis" || activeTab === "response_times" ? (
+            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" || activeTab === "link_graph" || activeTab === "orphan_pages" || activeTab === "content_quality" || activeTab === "depth_analysis" || activeTab === "response_times" || activeTab === "readability" || activeTab === "og_audit" ? (
               <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
             ) : activeTab === "issues" ? (
               <>
@@ -3025,6 +3051,186 @@ function KeywordsPanel({ data, loading, isTerminal }: { data: any | undefined; l
                     />
                   </div>
                 </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Readability Panel ───────────────────────────────────────────────────
+function ReadabilityPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Readability analysis available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Analyzing readability...</div>;
+  if (!data || !data.pages?.length) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No readability data available</div>;
+
+  const { stats = {}, text_ratio_distribution = [], pages = [] } = data;
+  const maxCount = Math.max(...text_ratio_distribution.map((d: any) => d.count), 1);
+
+  function readabilityLabel(score: number): { label: string; color: string } {
+    if (score >= 80) return { label: "Easy", color: "text-emerald-600" };
+    if (score >= 60) return { label: "Standard", color: "text-blue-600" };
+    if (score >= 40) return { label: "Difficult", color: "text-amber-600" };
+    return { label: "Very Difficult", color: "text-red-600" };
+  }
+
+  return (
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: "Pages Analyzed", value: stats.total_pages },
+          { label: "Avg Text Ratio", value: `${(stats.avg_text_ratio * 100).toFixed(1)}%` },
+          { label: "Avg Readability", value: stats.avg_readability?.toFixed(1) },
+          { label: "Avg Sentence Length", value: `${stats.avg_sentence_len?.toFixed(1)} words` },
+        ].map((s, i) => (
+          <div key={i} className="bg-white rounded-lg border border-gray-200 p-2 text-center">
+            <div className="text-lg font-bold text-gray-900">{s.value}</div>
+            <div className="text-[10px] text-gray-500">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Text Ratio Distribution */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <h3 className="text-xs font-semibold text-gray-700 mb-3">Text-to-HTML Ratio Distribution</h3>
+        <div className="space-y-2">
+          {text_ratio_distribution.map((d: any, i: number) => {
+            const colors = ["bg-red-400", "bg-orange-400", "bg-amber-400", "bg-blue-400", "bg-emerald-400"];
+            return (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-[10px] text-gray-500 w-16 text-right flex-shrink-0">{d.bucket}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-4 relative">
+                  <div
+                    className={`h-4 rounded-full ${colors[Math.min(i, colors.length - 1)]} transition-all`}
+                    style={{ width: `${Math.max((d.count / maxCount) * 100, 3)}%` }}
+                  />
+                  <span className="absolute inset-y-0 flex items-center pl-2 text-[10px] font-medium text-white mix-blend-difference">
+                    {d.count} pages
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Pages table */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-gray-50 z-10">
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="text-left py-1.5 px-2">URL</th>
+              <th className="text-right py-1.5 px-2 w-20">Text Ratio</th>
+              <th className="text-right py-1.5 px-2 w-24">Readability</th>
+              <th className="text-right py-1.5 px-2 w-24">Sentence Len</th>
+              <th className="text-right py-1.5 px-2 w-16">Words</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {pages.map((p: any, i: number) => {
+              const rl = readabilityLabel(p.readability_score);
+              return (
+                <tr key={i} className="hover:bg-gray-50/50">
+                  <td className="py-1.5 px-2 text-blue-600 truncate max-w-md" title={p.url}>
+                    {truncateUrl(p.url, 50)}
+                  </td>
+                  <td className="py-1.5 px-2 text-right font-mono">
+                    <span className={p.text_ratio < 0.1 ? "text-red-600" : p.text_ratio < 0.2 ? "text-amber-600" : "text-gray-600"}>
+                      {(p.text_ratio * 100).toFixed(1)}%
+                    </span>
+                  </td>
+                  <td className="py-1.5 px-2 text-right">
+                    <span className={`font-mono ${rl.color}`}>{p.readability_score}</span>
+                    <span className="text-[9px] text-gray-400 ml-1">{rl.label}</span>
+                  </td>
+                  <td className="py-1.5 px-2 text-right font-mono text-gray-600">{p.avg_sentence_len}</td>
+                  <td className="py-1.5 px-2 text-right font-mono text-gray-600">{p.word_count}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Open Graph Audit Panel ───────────────────────────────────────────���─
+function OgAuditPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">OG audit available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Auditing Open Graph tags...</div>;
+  if (!data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No OG data</div>;
+
+  const { stats = {}, pages = [] } = data;
+  const coveragePct = stats.total_pages > 0 ? ((stats.has_og / stats.total_pages) * 100).toFixed(0) : "0";
+
+  return (
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      {/* Stats */}
+      <div className="grid grid-cols-5 gap-2">
+        {[
+          { label: "Total Pages", value: stats.total_pages },
+          { label: "Has OG Tags", value: stats.has_og, good: true },
+          { label: "Missing OG", value: stats.missing_og, alert: stats.missing_og > 0 },
+          { label: "No OG Title", value: stats.missing_og_title, alert: stats.missing_og_title > 0 },
+          { label: "No OG Image", value: stats.missing_og_image, alert: stats.missing_og_image > 0 },
+        ].map((s, i) => (
+          <div key={i} className={`rounded-lg border p-2 text-center ${s.alert ? "bg-orange-50 border-orange-200" : s.good ? "bg-green-50 border-green-200" : "bg-white border-gray-200"}`}>
+            <div className={`text-lg font-bold ${s.alert ? "text-orange-600" : s.good ? "text-green-600" : "text-gray-900"}`}>{s.value}</div>
+            <div className="text-[10px] text-gray-500">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Coverage bar */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <div className="flex items-center justify-between text-xs text-gray-600 mb-1.5">
+          <span>OG Tag Coverage</span>
+          <span className="font-semibold">{coveragePct}%</span>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-3">
+          <div
+            className={`h-3 rounded-full transition-all ${Number(coveragePct) >= 80 ? "bg-emerald-500" : Number(coveragePct) >= 50 ? "bg-amber-500" : "bg-red-500"}`}
+            style={{ width: `${coveragePct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Pages table */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-gray-50 z-10">
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="text-left py-1.5 px-2">URL</th>
+              <th className="text-center py-1.5 px-2 w-12">OG</th>
+              <th className="text-left py-1.5 px-2 w-40">OG Title</th>
+              <th className="text-left py-1.5 px-2 w-40">OG Description</th>
+              <th className="text-center py-1.5 px-2 w-16">Image</th>
+              <th className="text-center py-1.5 px-2 w-16">Type</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {pages.map((p: any, i: number) => (
+              <tr key={i} className={`hover:bg-gray-50/50 ${!p.has_og ? "bg-orange-50/30" : ""}`}>
+                <td className="py-1.5 px-2 text-blue-600 truncate max-w-[14rem]" title={p.url}>
+                  {truncateUrl(p.url, 40)}
+                </td>
+                <td className="py-1.5 px-2 text-center">
+                  {p.has_og ? <span className="text-green-600">✓</span> : <span className="text-red-400">✗</span>}
+                </td>
+                <td className="py-1.5 px-2 text-gray-700 truncate max-w-[10rem]" title={p.og_title}>
+                  {p.og_title || <span className="text-gray-300 italic">—</span>}
+                </td>
+                <td className="py-1.5 px-2 text-gray-600 truncate max-w-[10rem]" title={p.og_description}>
+                  {p.og_description || <span className="text-gray-300 italic">—</span>}
+                </td>
+                <td className="py-1.5 px-2 text-center">
+                  {p.og_image ? <span className="text-green-600">✓</span> : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="py-1.5 px-2 text-center text-gray-500">{p.og_type || "—"}</td>
               </tr>
             ))}
           </tbody>

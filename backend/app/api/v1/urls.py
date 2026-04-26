@@ -760,6 +760,28 @@ async def get_response_time_distribution(
     return await repo.get_response_time_distribution(crawl_id)
 
 
+@router.get("/crawls/{crawl_id}/readability")
+async def get_readability(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(200, ge=1, le=1000),
+) -> dict:
+    """Analyze readability scores, text ratio, and sentence complexity."""
+    repo = UrlRepository(db)
+    return await repo.get_readability_analysis(crawl_id, limit=limit)
+
+
+@router.get("/crawls/{crawl_id}/og-audit")
+async def get_og_audit(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(200, ge=1, le=1000),
+) -> dict:
+    """Audit Open Graph and social media meta tags."""
+    repo = UrlRepository(db)
+    return await repo.get_og_audit(crawl_id, limit=limit)
+
+
 @router.get("/crawls/{crawl_id}/orphan-pages")
 async def get_orphan_pages(
     crawl_id: uuid.UUID,

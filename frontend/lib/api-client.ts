@@ -316,6 +316,14 @@ export const urlsApi = {
   responseTimes: (crawlId: string) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/response-times`),
+
+  readability: (crawlId: string, limit = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/readability${qs({ limit })}`),
+
+  ogAudit: (crawlId: string, limit = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/og-audit${qs({ limit })}`),
 };
 
 export const extractionRulesApi = {
