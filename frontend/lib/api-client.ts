@@ -30,6 +30,7 @@ import type {
   ConfigProfile,
   ConfigProfileCreate,
   ConfigProfileUpdate,
+  AlertItem,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -424,6 +425,33 @@ export const configProfilesApi = {
     request<void>(`/config-profiles/${profileId}`, {
       method: "DELETE",
     }),
+};
+
+export const alertsApi = {
+  list: (projectId?: string, unreadOnly = false, limit = 50) =>
+    request<AlertItem[]>(
+      `/alerts${qs({ project_id: projectId, unread_only: unreadOnly, limit })}`
+    ),
+
+  unreadCount: (projectId?: string) =>
+    request<{ unread_count: number }>(
+      `/alerts/unread-count${qs({ project_id: projectId })}`
+    ),
+
+  markRead: (alertId: string) =>
+    request<void>(`/alerts/${alertId}/read`, { method: "POST" }),
+
+  markAllRead: (projectId: string) =>
+    request<void>(`/alerts/mark-all-read${qs({ project_id: projectId })}`, {
+      method: "POST",
+    }),
+
+  delete: (alertId: string) =>
+    request<void>(`/alerts/${alertId}`, { method: "DELETE" }),
+
+  analyze: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/alerts/analyze/${crawlId}`, { method: "POST" }),
 };
 
 export const issuesApi = {

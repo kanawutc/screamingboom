@@ -10,6 +10,7 @@ from app.models.redirect import Redirect
 from app.models.extraction_rule import ExtractionRule
 from app.models.schedule import CrawlSchedule
 from app.models.config_profile import ConfigProfile
+from app.models.alert import Alert
 
 __all__ = [
     "Base",
@@ -22,4 +23,5 @@ __all__ = [
     "ExtractionRule",
     "CrawlSchedule",
     "ConfigProfile",
+    "Alert",
 ]

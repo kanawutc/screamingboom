@@ -397,6 +397,21 @@ export interface ConfigProfileUpdate {
   is_default?: boolean;
 }
 
+// ─── Alerts ─────────────────────────────────────────────────────────
+export interface AlertItem {
+  id: string;
+  project_id: string;
+  crawl_id: string;
+  alert_type: string;
+  severity: string;
+  title: string;
+  description: string;
+  metric_before: number | null;
+  metric_after: number | null;
+  is_read: boolean;
+  created_at: string;
+}
+
 // ─── Schedules ──────────────────────────────────────────────────────
 export interface ScheduleCrawlConfig {
   start_url?: string | null;

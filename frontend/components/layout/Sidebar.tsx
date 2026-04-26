@@ -2,18 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Bug, Settings, Plus, Clock } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { LayoutDashboard, Bug, Settings, Plus, Clock, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { alertsApi } from "@/lib/api-client";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Crawls", href: "/crawls", icon: Bug },
   { name: "Schedules", href: "/schedules", icon: Clock },
+  { name: "Alerts", href: "/alerts", icon: Bell, showBadge: true },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+
+  const { data: unreadData } = useQuery({
+    queryKey: ["alerts-unread"],
+    queryFn: () => alertsApi.unreadCount(),
+    refetchInterval: 30000,
+  });
+  const unreadCount = unreadData?.unread_count ?? 0;
 
   return (
     <div className="hidden w-52 flex-shrink-0 flex-col bg-[#2b2d31] md:flex">
@@ -52,6 +62,11 @@ export function Sidebar() {
             >
               <item.icon className="h-3.5 w-3.5" />
               {item.name}
+              {item.showBadge && unreadCount > 0 && (
+                <span className="ml-auto inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </Link>
           );
         })}

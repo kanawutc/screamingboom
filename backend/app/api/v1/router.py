@@ -14,6 +14,7 @@ from app.api.v1.extraction_rules import router as extraction_rules_router
 from app.api.v1.custom_rules import router as custom_rules_router
 from app.api.v1.schedules import router as schedules_router
 from app.api.v1.config_profiles import router as config_profiles_router
+from app.api.v1.alerts import router as alerts_router
 
 logger = structlog.get_logger(__name__)
 
@@ -29,6 +30,7 @@ v1_router.include_router(extraction_rules_router)
 v1_router.include_router(custom_rules_router)
 v1_router.include_router(schedules_router)
 v1_router.include_router(config_profiles_router)
+v1_router.include_router(alerts_router)
 
 
 @v1_router.get("/health", tags=["health"])

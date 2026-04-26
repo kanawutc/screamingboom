@@ -157,6 +157,25 @@ async def start_crawl_job(ctx: dict, crawl_id: str) -> dict:
             crawled=stats.crawled_count,
             errors=stats.error_count,
         )
+
+        # Run alert analysis after crawl completes
+        try:
+            from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+            from app.core.config import settings as app_settings
+            from app.services.alert_service import AlertService
+
+            alert_engine = create_async_engine(app_settings.database_url, pool_pre_ping=True)
+            alert_session_maker = async_sessionmaker(alert_engine, class_=AsyncSession, expire_on_commit=False)
+            async with alert_session_maker() as alert_session:
+                alert_svc = AlertService(alert_session)
+                alerts = await alert_svc.analyze_crawl(crawl_uuid)
+                await alert_session.commit()
+                if alerts:
+                    logger.info("alerts_generated_post_crawl", crawl_id=crawl_id, count=len(alerts))
+            await alert_engine.dispose()
+        except Exception:
+            logger.exception("alert_analysis_failed", crawl_id=crawl_id)
+
         return {
             "crawl_id": crawl_id,
             "crawled_count": stats.crawled_count,
