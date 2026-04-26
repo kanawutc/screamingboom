@@ -508,6 +508,17 @@ async def get_link_scores(
     return await repo.get_link_scores(crawl_id, limit=limit)
 
 
+@router.get("/crawls/{crawl_id}/redirects")
+async def get_redirect_chains(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(200, ge=1, le=1000),
+) -> list[dict]:
+    """Get pages with redirects and their full redirect chains."""
+    repo = UrlRepository(db)
+    return await repo.get_redirect_chains(crawl_id, limit=limit)
+
+
 @router.get("/crawls/{crawl_id}/health")
 async def get_health_score(
     crawl_id: uuid.UUID,

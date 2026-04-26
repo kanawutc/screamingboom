@@ -225,6 +225,10 @@ export const urlsApi = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any[]>(`/crawls/${crawlId}/content-analysis${qs({ limit })}`),
 
+  redirectChains: (crawlId: string, limit = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any[]>(`/crawls/${crawlId}/redirects${qs({ limit })}`),
+
   healthScore: (crawlId: string) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/health`),

@@ -33,7 +33,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "internal" | "external" | "response_codes" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "issues";
+type TabKey = "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -41,6 +41,7 @@ const TABS: TabDef[] = [
   { key: "internal", label: "Internal", icon: <Globe className="h-3 w-3" /> },
   { key: "external", label: "External", icon: <ExternalLinkIcon className="h-3 w-3" /> },
   { key: "response_codes", label: "Response Codes", icon: <Hash className="h-3 w-3" /> },
+  { key: "redirects", label: "Redirects", icon: <Navigation className="h-3 w-3" /> },
   { key: "page_titles", label: "Page Titles", icon: <Type className="h-3 w-3" /> },
   { key: "meta_desc", label: "Meta Description", icon: <FileText className="h-3 w-3" /> },
   { key: "h1", label: "H1", icon: <Heading1 className="h-3 w-3" /> },
@@ -87,6 +88,9 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
     { label: "3xx Redirect", filter: { status_code_min: 300, status_code_max: 399 } },
     { label: "4xx Client Error", filter: { status_code_min: 400, status_code_max: 499 } },
     { label: "5xx Server Error", filter: { status_code_min: 500, status_code_max: 599 } },
+  ],
+  redirects: [
+    { label: "All", filter: {} },
   ],
   page_titles: [
     { label: "All", filter: {} },
@@ -269,7 +273,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "links_analysis" && activeTab !== "duplicates",
+    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -337,6 +341,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-content-analysis", crawlId],
     queryFn: () => urlsApi.contentAnalysis(crawlId),
     enabled: !!crawl && activeTab === "content" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: redirectsData, isLoading: redirectsLoading } = useQuery<any[]>({
+    queryKey: ["crawl-redirects", crawlId],
+    queryFn: () => urlsApi.redirectChains(crawlId),
+    enabled: !!crawl && activeTab === "redirects" && isTerminal,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -590,6 +601,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <PaginationAuditTable items={pagItems} loading={pagLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             ) : activeTab === "custom_search" ? (
               <CustomSearchTable items={csItems} loading={csLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
+            ) : activeTab === "redirects" ? (
+              <RedirectsPanel data={redirectsData} loading={redirectsLoading} isTerminal={isTerminal} />
             ) : activeTab === "content" ? (
               <ContentAnalysisPanel data={contentAnalysisData} loading={contentLoading} isTerminal={isTerminal} />
             ) : activeTab === "performance" ? (
@@ -1579,6 +1592,72 @@ function ContentAnalysisPanel({ data, loading, isTerminal }: { data: any[] | und
     </div>
   );
 }
+function RedirectsPanel({ data, loading, isTerminal }: { data: any[] | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Redirect analysis available after crawl completes.</div>;
+  if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Analyzing redirects...</div>;
+  if (!data || data.length === 0) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">No redirects found — all URLs resolved directly.</div>;
+
+  const longChains = data.filter((r: any) => r.chain_length > 2);
+  const status301 = data.filter((r: any) => r.status_code === 301);
+  const status302 = data.filter((r: any) => r.status_code === 302);
+
+  return (
+    <div className="overflow-auto">
+      <div className="flex gap-3 p-3 border-b border-gray-200">
+        <div className="flex-1 p-2 bg-blue-50 rounded border border-blue-200 text-center">
+          <div className="text-[10px] text-blue-500 uppercase tracking-wide">Total Redirects</div>
+          <div className="text-lg font-bold text-blue-700">{data.length}</div>
+        </div>
+        <div className="flex-1 p-2 bg-green-50 rounded border border-green-200 text-center">
+          <div className="text-[10px] text-green-500 uppercase tracking-wide">301 Permanent</div>
+          <div className="text-lg font-bold text-green-700">{status301.length}</div>
+        </div>
+        <div className="flex-1 p-2 bg-amber-50 rounded border border-amber-200 text-center">
+          <div className="text-[10px] text-amber-500 uppercase tracking-wide">302 Temporary</div>
+          <div className="text-lg font-bold text-amber-700">{status302.length}</div>
+        </div>
+        <div className="flex-1 p-2 bg-red-50 rounded border border-red-200 text-center">
+          <div className="text-[10px] text-red-500 uppercase tracking-wide">Long Chains ({">"}2)</div>
+          <div className="text-lg font-bold text-red-700">{longChains.length}</div>
+        </div>
+      </div>
+      <table className="w-full text-[11px]">
+        <thead className="bg-gray-50 sticky top-0">
+          <tr className="text-left text-[10px] text-gray-500 uppercase tracking-wider">
+            <th className="px-3 py-1.5 font-medium">Source URL</th>
+            <th className="px-3 py-1.5 font-medium text-center w-16">Status</th>
+            <th className="px-3 py-1.5 font-medium">Destination</th>
+            <th className="px-3 py-1.5 font-medium text-center w-16">Hops</th>
+            <th className="px-3 py-1.5 font-medium">Chain</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((r: any, i: number) => (
+            <tr key={i} className={`border-t border-gray-100 hover:bg-blue-50/40 ${r.chain_length > 2 ? "bg-red-50/30" : ""}`}>
+              <td className="px-3 py-1.5 truncate max-w-[250px]" title={r.url}>{truncateUrl(r.url, 40)}</td>
+              <td className={`px-3 py-1.5 text-center font-mono font-medium ${r.status_code === 301 ? "text-green-600" : "text-amber-600"}`}>{r.status_code}</td>
+              <td className="px-3 py-1.5 truncate max-w-[250px] text-blue-600" title={r.redirect_url}>{truncateUrl(r.redirect_url || "", 40)}</td>
+              <td className={`px-3 py-1.5 text-center font-mono ${r.chain_length > 2 ? "text-red-600 font-bold" : ""}`}>{r.chain_length}</td>
+              <td className="px-3 py-1.5">
+                {r.chain && r.chain.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-0.5">
+                    {r.chain.map((hop: any, j: number) => (
+                      <span key={j} className="inline-flex items-center">
+                        {j > 0 && <span className="text-gray-300 mx-0.5">&rarr;</span>}
+                        <span className="text-[9px] px-1 py-0.5 bg-gray-100 rounded truncate max-w-[120px]" title={typeof hop === "string" ? hop : hop.url}>{truncateUrl(typeof hop === "string" ? hop : (hop.url || ""), 20)}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : <span className="text-gray-300">—</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function PerformancePanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
   if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Performance analysis available after crawl completes.</div>;
   if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Analyzing performance...</div>;

@@ -960,6 +960,37 @@ class UrlRepository:
             "issue_counts": header_counts,
         }
 
+    async def get_redirect_chains(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 200,
+    ) -> list[dict]:
+        """Get pages with redirect chains."""
+        sql = text("""
+            SELECT id, url, status_code, redirect_url, redirect_chain
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND redirect_url IS NOT NULL
+            ORDER BY
+                jsonb_array_length(COALESCE(redirect_chain, '[]'::jsonb)) DESC,
+                url
+            LIMIT :limit
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        return [
+            {
+                "url_id": str(r.id),
+                "url": r.url,
+                "status_code": r.status_code,
+                "redirect_url": r.redirect_url,
+                "chain": r.redirect_chain or [],
+                "chain_length": len(r.redirect_chain) if r.redirect_chain else 1,
+            }
+            for r in result.all()
+        ]
+
     async def get_health_score(
         self,
         crawl_id: uuid.UUID,
