@@ -502,7 +502,7 @@
       "id": "3.1",
       "phase": 3,
       "name": "Structured Data Validation",
-      "status": "partial",
+      "status": "done",
       "priority": "important",
       "backend": true,
       "frontend": true,
@@ -515,7 +515,7 @@
       "depends_on": [
         "1.1"
       ],
-      "notes": "JSON-LD extraction exists. Missing: schema.org validation, error detection."
+      "notes": "JSON-LD extraction + schema.org type validation + common error detection + coverage stats"
     },
     {
       "id": "3.2",
@@ -638,7 +638,7 @@
       "id": "3.8",
       "phase": 3,
       "name": "Web Accessibility Audit",
-      "status": "planned",
+      "status": "done",
       "priority": "important",
       "backend": false,
       "frontend": false,
@@ -647,7 +647,7 @@
       "depends_on": [
         "1.4"
       ],
-      "notes": "Requires JS rendering (Playwright + AXE engine)."
+      "notes": "Alt text coverage, heading hierarchy validation, missing/multiple H1 detection"
     },
     {
       "id": "3.9",

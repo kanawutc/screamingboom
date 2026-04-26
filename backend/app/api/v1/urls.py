@@ -782,6 +782,17 @@ async def get_og_audit(
     return await repo.get_og_audit(crawl_id, limit=limit)
 
 
+@router.get("/crawls/{crawl_id}/structured-data-validation")
+async def get_structured_data_validation(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(200, ge=1, le=1000),
+) -> dict:
+    """Validate structured data: type distribution, common errors, coverage."""
+    repo = UrlRepository(db)
+    return await repo.get_structured_data_validation(crawl_id, limit=limit)
+
+
 @router.get("/crawls/{crawl_id}/accessibility")
 async def get_accessibility_audit(
     crawl_id: uuid.UUID,

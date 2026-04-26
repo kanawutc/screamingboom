@@ -2531,3 +2531,105 @@ class UrlRepository:
             },
             "heading_issues": heading_issues,
         }
+
+    async def get_structured_data_validation(
+        self, crawl_id: uuid.UUID, limit: int = 200
+    ) -> dict[str, Any]:
+        """Validate structured data: type distribution, common errors, coverage."""
+        s = self._session
+
+        sql = text("""
+            SELECT
+                id, url,
+                COALESCE(seo_data->>'title', '') AS title,
+                seo_data->'json_ld' AS json_ld
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND status_code >= 200 AND status_code < 300
+                AND seo_data->'json_ld' IS NOT NULL
+                AND jsonb_array_length(COALESCE(seo_data->'json_ld', '[]'::jsonb)) > 0
+            ORDER BY url
+            LIMIT :limit
+        """)
+        result = await s.execute(sql, {"crawl_id": str(crawl_id), "limit": limit})
+        rows = result.all()
+
+        # Count total HTML pages for coverage
+        total_sql = text("""
+            SELECT COUNT(*) AS total
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND status_code >= 200 AND status_code < 300
+        """)
+        total_result = await s.execute(total_sql, {"crawl_id": str(crawl_id)})
+        total_pages = total_result.scalar() or 0
+
+        type_counts: dict[str, int] = {}
+        pages = []
+        warnings_count = 0
+
+        for r in rows:
+            blocks = r.json_ld if isinstance(r.json_ld, list) else []
+            types_found = []
+            page_warnings = []
+
+            for block in blocks:
+                if not isinstance(block, dict):
+                    continue
+                sd_type = block.get("@type", "Unknown")
+                if isinstance(sd_type, list):
+                    sd_type = ", ".join(sd_type)
+                types_found.append(sd_type)
+                type_counts[sd_type] = type_counts.get(sd_type, 0) + 1
+
+                # Validation checks
+                if not block.get("@context"):
+                    page_warnings.append(f"Missing @context in {sd_type}")
+                if sd_type in ("Article", "BlogPosting", "NewsArticle"):
+                    if not block.get("headline"):
+                        page_warnings.append(f"Missing 'headline' in {sd_type}")
+                    if not block.get("datePublished"):
+                        page_warnings.append(f"Missing 'datePublished' in {sd_type}")
+                    if not block.get("author"):
+                        page_warnings.append(f"Missing 'author' in {sd_type}")
+                elif sd_type == "Product":
+                    if not block.get("name"):
+                        page_warnings.append("Missing 'name' in Product")
+                    if not block.get("offers"):
+                        page_warnings.append("Missing 'offers' in Product")
+                elif sd_type in ("Organization", "LocalBusiness"):
+                    if not block.get("name"):
+                        page_warnings.append(f"Missing 'name' in {sd_type}")
+                elif sd_type == "BreadcrumbList":
+                    items = block.get("itemListElement", [])
+                    if not items:
+                        page_warnings.append("Empty BreadcrumbList")
+
+            if page_warnings:
+                warnings_count += 1
+
+            pages.append({
+                "url_id": str(r.id),
+                "url": r.url,
+                "title": r.title or "",
+                "types": types_found,
+                "block_count": len(blocks),
+                "warnings": page_warnings,
+            })
+
+        # Sort type_counts by frequency
+        sorted_types = sorted(type_counts.items(), key=lambda x: x[1], reverse=True)
+
+        return {
+            "stats": {
+                "total_html_pages": total_pages,
+                "pages_with_sd": len(pages),
+                "coverage_pct": round(len(pages) / max(total_pages, 1) * 100, 1),
+                "unique_types": len(type_counts),
+                "pages_with_warnings": warnings_count,
+            },
+            "type_distribution": [{"type": t, "count": c} for t, c in sorted_types],
+            "pages": pages,
+        }

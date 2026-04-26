@@ -336,6 +336,10 @@ export const urlsApi = {
   accessibilityAudit: (crawlId: string, limit = 200) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/accessibility${qs({ limit })}`),
+
+  structuredDataValidation: (crawlId: string, limit = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/structured-data-validation${qs({ limit })}`),
 };
 
 export const extractionRulesApi = {
