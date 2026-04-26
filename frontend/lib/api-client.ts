@@ -272,6 +272,14 @@ export const urlsApi = {
   headingHierarchy: (crawlId: string, limit = 200) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any[]>(`/crawls/${crawlId}/heading-hierarchy${qs({ limit })}`),
+
+  timeline: (crawlId: string, cursor?: string | null, limit = 50, status?: string | null) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/timeline${qs({ cursor, limit, status })}`),
+
+  crawlSpeed: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any[]>(`/crawls/${crawlId}/crawl-speed`),
 };
 
 export const extractionRulesApi = {

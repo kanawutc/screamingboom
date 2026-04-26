@@ -33,7 +33,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -64,6 +64,7 @@ const TABS: TabDef[] = [
   { key: "site_structure", label: "Structure", icon: <FolderTree className="h-3 w-3" /> },
   { key: "robots_txt", label: "Robots.txt", icon: <Bot className="h-3 w-3" /> },
   { key: "sitemaps", label: "Sitemaps", icon: <Map className="h-3 w-3" /> },
+  { key: "crawl_log", label: "Crawl Log", icon: <FileText className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -194,6 +195,12 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   sitemaps: [
     { label: "All", filter: {} },
   ],
+  crawl_log: [
+    { label: "All", filter: {} },
+    { label: "OK (2xx)", filter: { log_status: "ok" } },
+    { label: "Redirects", filter: { log_status: "redirects" } },
+    { label: "Errors", filter: { log_status: "errors" } },
+  ],
   issues: [
     { label: "All", filter: {} },
     { label: "Critical", filter: { severity: "critical" } },
@@ -255,8 +262,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
   useCrawlWebSocket(crawlId, { enabled: wsEnabled });
 
   useEffect(() => { if (liveStatus && !isActive(liveStatus)) refetchCrawl(); }, [liveStatus, refetchCrawl]);
-  useEffect(() => { setUrlCursor(null); setExtCursor(null); setSdCursor(null); setCeCursor(null); setPagCursor(null); setActiveSubFilter(0); setSearchText(""); setSearchInput(""); }, [activeTab]);
-  useEffect(() => { setUrlCursor(null); setIssueCursor(null); setExtCursor(null); setSdCursor(null); setCeCursor(null); setPagCursor(null); }, [activeSubFilter]);
+  useEffect(() => { setUrlCursor(null); setExtCursor(null); setSdCursor(null); setCeCursor(null); setPagCursor(null); setLogCursor(null); setActiveSubFilter(0); setSearchText(""); setSearchInput(""); }, [activeTab]);
+  useEffect(() => { setUrlCursor(null); setIssueCursor(null); setExtCursor(null); setSdCursor(null); setCeCursor(null); setPagCursor(null); setLogCursor(null); }, [activeSubFilter]);
 
   const currentSubFilters = SUB_FILTERS[activeTab];
   const currentFilter = currentSubFilters[activeSubFilter]?.filter ?? {};
@@ -287,7 +294,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -432,6 +439,22 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-images-audit", crawlId],
     queryFn: () => urlsApi.imagesAudit(crawlId),
     enabled: !!crawl && activeTab === "images" && isTerminal,
+  });
+
+  const logStatusFilter = (currentFilter as Record<string, string>).log_status as string | undefined;
+  const [logCursor, setLogCursor] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: timelineData, isLoading: timelineLoading } = useQuery<any>({
+    queryKey: ["crawl-timeline", crawlId, logCursor, logStatusFilter],
+    queryFn: () => urlsApi.timeline(crawlId, logCursor, 100, logStatusFilter),
+    enabled: !!crawl && activeTab === "crawl_log",
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: crawlSpeedData } = useQuery<any[]>({
+    queryKey: ["crawl-speed", crawlId],
+    queryFn: () => urlsApi.crawlSpeed(crawlId),
+    enabled: !!crawl && activeTab === "crawl_log" && isTerminal,
   });
 
   const { data: issueSummary } = useQuery({
@@ -677,6 +700,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <RobotsTxtPanel data={robotsTxtData} loading={robotsLoading} />
             ) : activeTab === "sitemaps" ? (
               <SitemapPanel data={sitemapData} loading={sitemapLoading} />
+            ) : activeTab === "crawl_log" ? (
+              <CrawlLogPanel data={timelineData} loading={timelineLoading} speedData={crawlSpeedData} onLoadMore={() => setLogCursor(timelineData?.next_cursor)} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -684,7 +709,15 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
 
           {/* PAGINATION */}
           <div className="flex items-center justify-between px-3 py-1 bg-white border-t border-gray-200 text-[11px] text-gray-500 flex-shrink-0">
-            {activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" ? (
+            {activeTab === "crawl_log" ? (
+              <>
+                <span>Showing {timelineData?.items?.length ?? 0} events{timelineData?.summary ? ` of ${timelineData.summary.total}` : ""}</span>
+                <div className="flex gap-2">
+                  <button onClick={() => setLogCursor(null)} disabled={!logCursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">First</button>
+                  <button onClick={() => setLogCursor(timelineData?.next_cursor)} disabled={!timelineData?.next_cursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
+                </div>
+              </>
+            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" ? (
               <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
             ) : activeTab === "issues" ? (
               <>
@@ -2652,6 +2685,132 @@ function SitemapPanel({ data, loading }: { data: any | undefined; loading: boole
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── Crawl Log Panel ────────────────────────────────────────────────────
+function CrawlLogPanel({ data, loading, speedData, onLoadMore }: { data: any | undefined; loading: boolean; speedData: any[] | undefined; onLoadMore: () => void }) {
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Loading crawl log...</div>;
+  if (!data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No timeline data available</div>;
+
+  const summary = data.summary ?? {};
+  const items = data.items ?? [];
+
+  // Crawl speed chart (simple bar chart)
+  const maxSpeed = speedData ? Math.max(...speedData.map((d: any) => d.urls_per_second), 1) : 1;
+
+  return (
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+        <div className="bg-white rounded-lg border border-gray-200 p-2">
+          <div className="text-[10px] text-gray-500">Total URLs</div>
+          <div className="text-lg font-bold text-gray-900">{summary.total?.toLocaleString() ?? 0}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-green-200 p-2">
+          <div className="text-[10px] text-green-600">OK (2xx)</div>
+          <div className="text-lg font-bold text-green-700">{summary.ok_count?.toLocaleString() ?? 0}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-blue-200 p-2">
+          <div className="text-[10px] text-blue-600">Redirects</div>
+          <div className="text-lg font-bold text-blue-700">{summary.redirect_count?.toLocaleString() ?? 0}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-red-200 p-2">
+          <div className="text-[10px] text-red-600">Errors</div>
+          <div className="text-lg font-bold text-red-700">{summary.error_count?.toLocaleString() ?? 0}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-2">
+          <div className="text-[10px] text-gray-500">Avg Response</div>
+          <div className="text-lg font-bold text-gray-900">{summary.avg_response_ms ? `${summary.avg_response_ms}ms` : "-"}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-2">
+          <div className="text-[10px] text-gray-500">First Crawled</div>
+          <div className="text-xs font-medium text-gray-700">{summary.first_crawled ? new Date(summary.first_crawled).toLocaleTimeString() : "-"}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-2">
+          <div className="text-[10px] text-gray-500">Last Crawled</div>
+          <div className="text-xs font-medium text-gray-700">{summary.last_crawled ? new Date(summary.last_crawled).toLocaleTimeString() : "-"}</div>
+        </div>
+      </div>
+
+      {/* Crawl Speed Chart */}
+      {speedData && speedData.length > 1 && (
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <h3 className="text-xs font-semibold text-gray-700 mb-2">Crawl Speed (URLs/second)</h3>
+          <div className="flex items-end gap-px h-24">
+            {speedData.map((d: any, i: number) => (
+              <div key={i} className="flex-1 min-w-[2px] group relative">
+                <div
+                  className={`w-full rounded-t transition-colors ${d.urls_per_second > 3 ? "bg-green-500" : d.urls_per_second > 1 ? "bg-blue-500" : "bg-gray-400"}`}
+                  style={{ height: `${Math.max((d.urls_per_second / maxSpeed) * 100, 2)}%` }}
+                  title={`${new Date(d.timestamp).toLocaleTimeString()}: ${d.urls_per_second} URLs/s, avg ${d.avg_ms}ms`}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between text-[9px] text-gray-400 mt-1">
+            <span>{speedData.length > 0 ? new Date(speedData[0].timestamp).toLocaleTimeString() : ""}</span>
+            <span>{speedData.length > 0 ? new Date(speedData[speedData.length - 1].timestamp).toLocaleTimeString() : ""}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Timeline table */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-gray-50 z-10">
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="text-left py-1.5 px-2 w-36">Time</th>
+              <th className="text-left py-1.5 px-2 w-14">Status</th>
+              <th className="text-right py-1.5 px-2 w-16">Speed</th>
+              <th className="text-left py-1.5 px-2 w-10">Depth</th>
+              <th className="text-left py-1.5 px-2">URL</th>
+              <th className="text-left py-1.5 px-2 w-24">Content Type</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {items.map((item: any) => {
+              const sc = item.status_code ?? 0;
+              const scColor = sc >= 200 && sc < 300 ? "text-green-700 bg-green-50" :
+                sc >= 300 && sc < 400 ? "text-blue-700 bg-blue-50" :
+                sc >= 400 ? "text-red-700 bg-red-50" : "text-gray-500 bg-gray-50";
+              const timeStr = item.crawled_at ? new Date(item.crawled_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "-";
+              const msColor = (item.response_time_ms ?? 0) > 1000 ? "text-red-600" : (item.response_time_ms ?? 0) > 500 ? "text-yellow-600" : "text-green-700";
+              return (
+                <tr key={item.id} className="hover:bg-gray-50/50">
+                  <td className="py-1 px-2 font-mono text-gray-500">{timeStr}</td>
+                  <td className="py-1 px-2"><span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${scColor}`}>{sc}</span></td>
+                  <td className={`py-1 px-2 text-right font-mono ${msColor}`}>{item.response_time_ms ? `${item.response_time_ms}ms` : "-"}</td>
+                  <td className="py-1 px-2 text-center text-gray-500">{item.crawl_depth}</td>
+                  <td className="py-1 px-2 font-mono text-[11px] truncate max-w-[400px]" title={item.url}>
+                    {item.redirect_url ? (
+                      <span className="text-blue-600">{item.url} → {item.redirect_url}</span>
+                    ) : (
+                      <span>{item.url}</span>
+                    )}
+                  </td>
+                  <td className="py-1 px-2 text-gray-500 truncate">{item.content_type?.split(";")[0] ?? "-"}</td>
+                </tr>
+              );
+            })}
+            {items.length === 0 && (
+              <tr><td colSpan={6} className="py-8 text-center text-gray-400 italic">No events found</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {data.next_cursor && (
+        <div className="flex justify-center">
+          <button
+            onClick={onLoadMore}
+            className="px-4 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700"
+          >
+            Load More
+          </button>
+        </div>
+      )}
     </div>
   );
 }

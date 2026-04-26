@@ -1377,6 +1377,113 @@ class UrlRepository:
             for r in result.all()
         ]
 
+    async def get_crawl_timeline(
+        self,
+        crawl_id: uuid.UUID,
+        cursor: str | None = None,
+        limit: int = 50,
+        status_filter: str | None = None,
+    ) -> dict[str, Any]:
+        """Get chronological crawl timeline (most recent first)."""
+        base = """
+            SELECT id, url, status_code, content_type, response_time_ms,
+                   crawl_depth, title, is_indexable, redirect_url, crawled_at
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+        """
+        params: dict[str, Any] = {"crawl_id": str(crawl_id), "limit": limit + 1}
+
+        if status_filter == "errors":
+            base += " AND (status_code >= 400 OR status_code = 0)"
+        elif status_filter == "redirects":
+            base += " AND status_code BETWEEN 300 AND 399"
+        elif status_filter == "ok":
+            base += " AND status_code BETWEEN 200 AND 299"
+
+        if cursor:
+            base += " AND crawled_at < :cursor_ts"
+            params["cursor_ts"] = cursor
+
+        base += " ORDER BY crawled_at DESC LIMIT :limit"
+
+        result = await self._session.execute(text(base), params)
+        rows = list(result.all())
+
+        has_more = len(rows) > limit
+        page_items = rows[:limit]
+        next_cursor = page_items[-1].crawled_at.isoformat() if has_more and page_items else None
+
+        # Get summary stats
+        summary_sql = text("""
+            SELECT
+                COUNT(*) AS total,
+                MIN(crawled_at) AS first_crawled,
+                MAX(crawled_at) AS last_crawled,
+                COUNT(*) FILTER (WHERE status_code BETWEEN 200 AND 299) AS ok_count,
+                COUNT(*) FILTER (WHERE status_code BETWEEN 300 AND 399) AS redirect_count,
+                COUNT(*) FILTER (WHERE status_code >= 400 OR status_code = 0) AS error_count,
+                AVG(response_time_ms) FILTER (WHERE response_time_ms IS NOT NULL) AS avg_response_ms
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+        """)
+        summary_result = await self._session.execute(
+            summary_sql, {"crawl_id": str(crawl_id)}
+        )
+        s = summary_result.one()
+
+        return {
+            "items": [
+                {
+                    "id": str(r.id),
+                    "url": r.url,
+                    "status_code": r.status_code,
+                    "content_type": r.content_type,
+                    "response_time_ms": r.response_time_ms,
+                    "crawl_depth": r.crawl_depth,
+                    "title": r.title,
+                    "is_indexable": r.is_indexable,
+                    "redirect_url": r.redirect_url,
+                    "crawled_at": r.crawled_at.isoformat() if r.crawled_at else None,
+                }
+                for r in page_items
+            ],
+            "next_cursor": next_cursor,
+            "summary": {
+                "total": s.total,
+                "first_crawled": s.first_crawled.isoformat() if s.first_crawled else None,
+                "last_crawled": s.last_crawled.isoformat() if s.last_crawled else None,
+                "ok_count": s.ok_count,
+                "redirect_count": s.redirect_count,
+                "error_count": s.error_count,
+                "avg_response_ms": round(float(s.avg_response_ms), 1) if s.avg_response_ms else None,
+            },
+        }
+
+    async def get_crawl_speed_chart(
+        self,
+        crawl_id: uuid.UUID,
+    ) -> list[dict[str, Any]]:
+        """Get URLs crawled per second for speed chart."""
+        sql = text("""
+            SELECT
+                date_trunc('second', crawled_at) AS ts,
+                COUNT(*) AS urls_per_second,
+                AVG(response_time_ms) AS avg_ms
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+            GROUP BY ts
+            ORDER BY ts
+        """)
+        result = await self._session.execute(sql, {"crawl_id": str(crawl_id)})
+        return [
+            {
+                "timestamp": r.ts.isoformat(),
+                "urls_per_second": r.urls_per_second,
+                "avg_ms": round(float(r.avg_ms), 1) if r.avg_ms else None,
+            }
+            for r in result.all()
+        ]
+
     async def get_hreflang_data(
         self,
         crawl_id: uuid.UUID,

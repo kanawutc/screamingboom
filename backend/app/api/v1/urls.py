@@ -582,6 +582,31 @@ async def get_hreflang_data(
     return await repo.get_hreflang_data(crawl_id, limit=limit)
 
 
+@router.get("/crawls/{crawl_id}/timeline")
+async def get_crawl_timeline(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    cursor: str | None = Query(None, description="ISO timestamp cursor for pagination"),
+    limit: int = Query(50, ge=1, le=200),
+    status: str | None = Query(None, description="Filter: ok, redirects, errors"),
+) -> dict:
+    """Get chronological crawl timeline with URL events."""
+    repo = UrlRepository(db)
+    return await repo.get_crawl_timeline(
+        crawl_id, cursor=cursor, limit=limit, status_filter=status,
+    )
+
+
+@router.get("/crawls/{crawl_id}/crawl-speed")
+async def get_crawl_speed(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+) -> list[dict]:
+    """Get crawl speed chart data (URLs per second over time)."""
+    repo = UrlRepository(db)
+    return await repo.get_crawl_speed_chart(crawl_id)
+
+
 @router.get("/crawls/{crawl_id}/heading-hierarchy")
 async def get_heading_hierarchy(
     crawl_id: uuid.UUID,
