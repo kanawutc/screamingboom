@@ -195,7 +195,7 @@ export const urlsApi = {
     ),
 
   customExtractions: (crawlId: string, limit = 100) =>
-    request<CustomExtractionItem[]>(
+    request<{ items: CustomExtractionItem[]; next_cursor: string | null }>(
       `/crawls/${crawlId}/extractions${qs({ limit })}`
     ),
 
