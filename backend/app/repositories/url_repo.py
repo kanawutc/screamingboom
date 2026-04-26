@@ -960,6 +960,93 @@ class UrlRepository:
             "issue_counts": header_counts,
         }
 
+    async def get_health_score(
+        self,
+        crawl_id: uuid.UUID,
+    ) -> dict:
+        """Calculate SEO health score (0-100) based on crawl metrics."""
+        sql = text("""
+            SELECT
+                COUNT(*) AS total_urls,
+                COUNT(*) FILTER (WHERE status_code BETWEEN 200 AND 299) AS ok_urls,
+                COUNT(*) FILTER (WHERE status_code BETWEEN 300 AND 399) AS redirect_urls,
+                COUNT(*) FILTER (WHERE status_code >= 400) AS error_urls,
+                COUNT(*) FILTER (WHERE is_indexable = true) AS indexable_urls,
+                AVG(response_time_ms) FILTER (WHERE response_time_ms IS NOT NULL) AS avg_response_ms,
+                COUNT(*) FILTER (WHERE response_time_ms > 1000) AS slow_urls
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+        """)
+        result = await self._session.execute(sql, {"crawl_id": str(crawl_id)})
+        row = result.one()
+
+        issues_sql = text("""
+            SELECT
+                COUNT(*) FILTER (WHERE severity = 'critical') AS critical,
+                COUNT(*) FILTER (WHERE severity = 'warning') AS warnings,
+                COUNT(*) AS total_issues
+            FROM url_issues
+            WHERE crawl_id = :crawl_id
+        """)
+        issues_result = await self._session.execute(issues_sql, {"crawl_id": str(crawl_id)})
+        issues = issues_result.one()
+
+        total = row.total_urls or 1
+
+        # Score components (each 0-100, weighted)
+        # 1. Status code health (30%): % of 200 OK pages
+        status_score = float(row.ok_urls / total) * 100
+
+        # 2. Indexability (20%): % of indexable pages out of OK pages
+        ok = row.ok_urls or 1
+        index_score = float(row.indexable_urls / ok) * 100
+
+        # 3. Issue density (30%): fewer critical/warning issues = better
+        critical_penalty = min(issues.critical * 5, 50)
+        warning_penalty = min(issues.warnings * 1, 30)
+        issue_score = float(max(100 - critical_penalty - warning_penalty, 0))
+
+        # 4. Performance (20%): fast = good
+        avg_ms = float(row.avg_response_ms or 500)
+        if avg_ms < 300:
+            perf_score = 100
+        elif avg_ms < 1000:
+            perf_score = 100 - ((avg_ms - 300) / 700) * 50
+        elif avg_ms < 3000:
+            perf_score = 50 - ((avg_ms - 1000) / 2000) * 40
+        else:
+            perf_score = 10
+
+        # Weighted average
+        health = (
+            status_score * 0.30
+            + index_score * 0.20
+            + issue_score * 0.30
+            + perf_score * 0.20
+        )
+        health = round(min(max(health, 0), 100), 1)
+
+        return {
+            "score": health,
+            "grade": "A" if health >= 90 else "B" if health >= 75 else "C" if health >= 60 else "D" if health >= 40 else "F",
+            "components": {
+                "status_codes": round(status_score, 1),
+                "indexability": round(index_score, 1),
+                "issues": round(issue_score, 1),
+                "performance": round(perf_score, 1),
+            },
+            "metrics": {
+                "total_urls": total,
+                "ok_urls": row.ok_urls,
+                "error_urls": row.error_urls,
+                "redirect_urls": row.redirect_urls,
+                "indexable_urls": row.indexable_urls,
+                "critical_issues": issues.critical,
+                "warning_issues": issues.warnings,
+                "avg_response_ms": round(avg_ms, 1),
+            },
+        }
+
     async def get_performance_stats(
         self,
         crawl_id: uuid.UUID,

@@ -379,6 +379,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     enabled: !!crawl && isTerminal,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: healthScore } = useQuery<any>({
+    queryKey: ["crawl-health", crawlId],
+    queryFn: () => urlsApi.healthScore(crawlId),
+    enabled: !!crawl && isTerminal,
+  });
+
   const { data: selectedUrlDetail } = useQuery({
     queryKey: ["url-detail", crawlId, selectedUrlId],
     queryFn: () => urlsApi.get(crawlId, selectedUrlId!),
@@ -667,6 +674,30 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         {/* RIGHT SIDEBAR */}
         <div className="w-56 flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
           <div className="sf-panel-header">Overview</div>
+          {/* Health Score */}
+          {healthScore && (
+            <div className="px-2 py-2 border-b border-gray-200 text-center">
+              <div className={`text-3xl font-bold ${
+                healthScore.score >= 90 ? "text-green-600" :
+                healthScore.score >= 75 ? "text-blue-600" :
+                healthScore.score >= 60 ? "text-amber-600" :
+                "text-red-600"
+              }`}>{healthScore.score}</div>
+              <div className="text-[10px] text-gray-400 uppercase tracking-wide">SEO Health</div>
+              <div className={`text-xs font-bold mt-0.5 ${
+                healthScore.grade === "A" ? "text-green-600" :
+                healthScore.grade === "B" ? "text-blue-600" :
+                healthScore.grade === "C" ? "text-amber-600" :
+                "text-red-600"
+              }`}>Grade {healthScore.grade}</div>
+              <div className="mt-1 grid grid-cols-2 gap-1 text-[9px]">
+                <div className="text-gray-400">Status <span className="text-gray-600 font-medium">{healthScore.components.status_codes}</span></div>
+                <div className="text-gray-400">Index <span className="text-gray-600 font-medium">{healthScore.components.indexability}</span></div>
+                <div className="text-gray-400">Issues <span className="text-gray-600 font-medium">{healthScore.components.issues}</span></div>
+                <div className="text-gray-400">Speed <span className="text-gray-600 font-medium">{healthScore.components.performance}</span></div>
+              </div>
+            </div>
+          )}
           {/* SERP Preview for selected URL */}
           {selectedUrlDetail && (
             <div className="px-2 py-2 border-b border-gray-200">
