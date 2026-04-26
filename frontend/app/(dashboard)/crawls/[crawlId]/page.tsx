@@ -867,7 +867,7 @@ function getColumnsForTab(tab: TabKey): ColDef[] {
   const responseTimeCol: ColDef = { key: "response_time", label: "Resp. Time", width: "80px", align: "right", render: (url) => <span className="text-gray-500">{url.response_time_ms != null ? `${url.response_time_ms}ms` : "\u2014"}</span> };
 
   switch (tab) {
-    case "internal": return [addressCol, statusCol, contentTypeCol, titleCol, indexableCol, depthCol, wordCountCol, responseTimeCol];
+    case "internal": return [addressCol, statusCol, contentTypeCol, titleCol, indexableCol, depthCol, wordCountCol, responseTimeCol, { key: "link_score", label: "Link Score", width: "75px", align: "right" as const, render: (url: CrawledUrl) => <span className={`font-mono ${(url.link_score ?? 0) >= 50 ? "text-green-700" : (url.link_score ?? 0) >= 20 ? "text-yellow-600" : "text-gray-400"}`}>{url.link_score ?? "\u2014"}</span> }];
     case "response_codes": return [addressCol, statusCol, contentTypeCol, indexableCol, { ...responseTimeCol, width: "90px" }, { key: "redirect", label: "Redirect URI", width: "20%", render: (url) => <span className="text-blue-600 truncate block">{url.redirect_url ?? "\u2014"}</span> }];
     case "page_titles": return [addressCol, statusCol, titleCol, titleLenCol, titlePxCol, indexableCol];
     case "meta_desc": return [addressCol, statusCol, metaDescCol, metaDescLenCol, indexableCol];
