@@ -738,7 +738,7 @@
       "id": "3.14",
       "phase": 3,
       "name": "Mobile Usability Check",
-      "status": "planned",
+      "status": "done",
       "priority": "important",
       "backend": false,
       "frontend": false,
@@ -746,7 +746,8 @@
       "files_frontend": [],
       "depends_on": [
         "1.4"
-      ]
+      ],
+      "notes": "Mobile viewport audit tab with responsive check"
     },
     {
       "id": "3.15",
