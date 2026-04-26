@@ -63,6 +63,7 @@ class CrawlConfig:
     url_rewrites: list[dict] = field(default_factory=list)
     strip_query_params: list[str] = field(default_factory=list)
     render_js: bool = False
+    max_connections: int = 0
 
 
 @dataclass

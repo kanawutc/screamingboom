@@ -31,6 +31,14 @@ async def run_post_crawl_analysis(pool: asyncpg.Pool, crawl_id: uuid.UUID) -> in
         total += await _detect_pagination_loops(conn, crawl_id)
         total += await _detect_pagination_sequence_errors(conn, crawl_id)
 
+    # Link Score calculation (runs outside the connection context)
+    from app.analysis.link_score import calculate_link_scores
+    try:
+        pages_scored = await calculate_link_scores(pool, crawl_id)
+        logger.info("link_score_calculated", crawl_id=str(crawl_id), pages_scored=pages_scored)
+    except Exception as e:
+        logger.warning("link_score_failed", crawl_id=str(crawl_id), error=str(e))
+
     logger.info("post_crawl_analysis_complete", crawl_id=str(crawl_id), issues_created=total)
     return total
 

@@ -204,6 +204,7 @@ EXPORT_COLUMNS = [
     "crawl_depth",
     "response_time_ms",
     "redirect_url",
+    "link_score",
 ]
 
 
@@ -482,3 +483,26 @@ async def get_duplicates(
         "exact_duplicates": await repo.get_exact_duplicate_groups(crawl_id),
         "near_duplicates": await repo.get_near_duplicate_groups(crawl_id),
     }
+
+
+
+@router.get("/crawls/{crawl_id}/content-analysis")
+async def get_content_analysis(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(100, ge=1, le=1000),
+) -> list[dict]:
+    """Get content analysis metrics: readability, text ratio, word count."""
+    repo = UrlRepository(db)
+    return await repo.get_content_analysis(crawl_id, limit=limit)
+
+
+@router.get("/crawls/{crawl_id}/link-scores")
+async def get_link_scores(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(100, ge=1, le=1000),
+) -> list[dict]:
+    """Get URLs ranked by Link Score (internal PageRank)."""
+    repo = UrlRepository(db)
+    return await repo.get_link_scores(crawl_id, limit=limit)

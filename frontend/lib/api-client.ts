@@ -216,6 +216,14 @@ export const urlsApi = {
   duplicates: (crawlId: string) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/duplicates`),
+
+  linkScores: (crawlId: string, limit = 100) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any[]>(`/crawls/${crawlId}/link-scores${qs({ limit })}`),
+
+  contentAnalysis: (crawlId: string, limit = 100) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any[]>(`/crawls/${crawlId}/content-analysis${qs({ limit })}`),
 };
 
 export const extractionRulesApi = {

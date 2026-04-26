@@ -31,6 +31,7 @@ class CrawledUrlResponse(BaseModel):
     crawl_depth: int
     response_time_ms: int | None = None
     redirect_url: str | None = None
+    link_score: int | None = None
     crawled_at: datetime
 
 

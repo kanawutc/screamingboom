@@ -23,6 +23,32 @@ _INVISIBLE_TAGS = {"script", "style", "noscript", "template", "svg", "math"}
 # Whitespace normalizer
 _WS_RE = re.compile(r"\s+")
 
+# Sentence boundary regex (English-ish)
+_SENTENCE_RE = re.compile(r"[.!?]+\s+|\n")
+
+# Vowel regex for syllable estimation
+_VOWELS = re.compile(r"[aeiouy]+", re.IGNORECASE)
+
+
+def _count_sentences(text: str) -> int:
+    """Estimate sentence count from text."""
+    parts = _SENTENCE_RE.split(text)
+    return max(len([p for p in parts if p.strip()]), 1)
+
+
+def _count_syllables(text: str) -> int:
+    """Estimate syllable count (English approximation)."""
+    words = text.lower().split()
+    total = 0
+    for word in words:
+        vowel_groups = _VOWELS.findall(word)
+        count = len(vowel_groups)
+        # Silent 'e' at end
+        if word.endswith("e") and count > 1:
+            count -= 1
+        total += max(count, 1)
+    return total
+
 
 @dataclass
 class LinkData:
@@ -103,6 +129,11 @@ class PageData:
     # Pagination attributes
     pagination: PaginationData | None = None
     pagination_count: dict = field(default_factory=dict)  # {"next": N, "prev": N}
+
+    # Phase 2.11: Content analysis
+    text_ratio: float = 0.0  # text-to-html ratio (0-1)
+    readability_score: float | None = None  # Flesch Reading Ease (0-100)
+    avg_words_per_sentence: float = 0.0
 
     # Phase 3E: Custom extraction rules results
     custom_extractions: dict = field(default_factory=dict)
@@ -484,6 +515,25 @@ class ParserPool:
         full_text = body.text(separator=" ", strip=True)
         full_text = _WS_RE.sub(" ", full_text).strip()
         data.word_count = len(full_text.split()) if full_text else 0
+
+        # Content analysis: text-to-code ratio and readability
+        if full_text and data.word_count > 0:
+            html_len = len(tree.html or "")
+            text_len = len(full_text)
+            data.text_ratio = round(text_len / max(html_len, 1), 4)
+
+            # Flesch Reading Ease (English approximation, works reasonably for other languages)
+            if data.word_count >= 30:
+                sentences = _count_sentences(full_text)
+                syllables = _count_syllables(full_text)
+                if sentences > 0:
+                    data.avg_words_per_sentence = round(data.word_count / sentences, 1)
+                    # Flesch formula: 206.835 - 1.015*(words/sentences) - 84.6*(syllables/words)
+                    asl = data.word_count / sentences
+                    asw = syllables / max(data.word_count, 1)
+                    data.readability_score = round(206.835 - 1.015 * asl - 84.6 * asw, 1)
+                    # Clamp to 0-100
+                    data.readability_score = max(0.0, min(100.0, data.readability_score))
 
         # Compute SimHash for near-duplicate detection (skip very short pages)
         if full_text and data.word_count >= 50:

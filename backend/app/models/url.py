@@ -75,5 +75,12 @@ class CrawledUrl(Base):
     # Relationships
     crawl: Mapped["Crawl"] = relationship("Crawl", back_populates="urls")
 
+    @property
+    def link_score(self) -> int | None:
+        """Link Score from seo_data JSONB."""
+        if self.seo_data and isinstance(self.seo_data, dict):
+            return self.seo_data.get("link_score")
+        return None
+
     def __repr__(self) -> str:
         return f"<CrawledUrl(id={self.id}, url={self.url!r}, status={self.status_code})>"

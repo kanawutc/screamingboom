@@ -817,3 +817,76 @@ class UrlRepository:
             })
         groups.sort(key=lambda g: g["count"], reverse=True)
         return groups[:50]
+
+    # ------------------------------------------------------------------
+    # Content Analysis (F2.11)
+    # ------------------------------------------------------------------
+
+    async def get_content_analysis(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Get content analysis metrics sorted by readability score."""
+        sql = text("""
+            SELECT id, url, title, word_count,
+                   (seo_data->>'text_ratio')::float AS text_ratio,
+                   (seo_data->>'readability_score')::float AS readability_score,
+                   (seo_data->>'avg_words_per_sentence')::float AS avg_words_per_sentence
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND content_type LIKE 'text/html%'
+              AND status_code = 200
+            ORDER BY word_count DESC
+            LIMIT :limit
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        return [
+            {
+                "id": str(r.id),
+                "url": r.url,
+                "title": r.title,
+                "word_count": r.word_count,
+                "text_ratio": r.text_ratio,
+                "readability_score": r.readability_score,
+                "avg_words_per_sentence": r.avg_words_per_sentence,
+            }
+            for r in result.all()
+        ]
+
+    # ------------------------------------------------------------------
+    # Link Score (F3.6)
+    # ------------------------------------------------------------------
+
+    async def get_link_scores(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Get URLs ranked by Link Score (descending)."""
+        sql = text("""
+            SELECT id, url, title, crawl_depth, status_code, word_count,
+                   (seo_data->>'link_score')::int AS link_score
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND seo_data->>'link_score' IS NOT NULL
+            ORDER BY (seo_data->>'link_score')::int DESC
+            LIMIT :limit
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        return [
+            {
+                "id": str(r.id),
+                "url": r.url,
+                "title": r.title,
+                "crawl_depth": r.crawl_depth,
+                "status_code": r.status_code,
+                "word_count": r.word_count,
+                "link_score": r.link_score,
+            }
+            for r in result.all()
+        ]

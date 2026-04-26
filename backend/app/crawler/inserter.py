@@ -168,9 +168,23 @@ class BatchInserter:
         if x_robots:
             seo_data["x_robots_tag"] = x_robots
 
+        # Sprint 4: Cookie audit — parse Set-Cookie headers
+        raw_cookies = headers.get("set-cookie")
+        if raw_cookies:
+            from app.analysis.cookies import parse_set_cookies
+            page_domain = fetch_result.final_url.split("/")[2] if "/" in fetch_result.final_url else ""
+            seo_data["cookies"] = parse_set_cookies(raw_cookies, page_domain)
+
         # Sprint 3: SimHash fingerprint for near-duplicate detection
         if page_data.simhash:
             seo_data["simhash"] = page_data.simhash
+
+        # Sprint 4: Content analysis
+        if page_data.text_ratio > 0:
+            seo_data["text_ratio"] = page_data.text_ratio
+        if page_data.readability_score is not None:
+            seo_data["readability_score"] = page_data.readability_score
+            seo_data["avg_words_per_sentence"] = page_data.avg_words_per_sentence
 
         redirect_chain = fetch_result.redirect_chain if fetch_result.redirect_chain else []
 

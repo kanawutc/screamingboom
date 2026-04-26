@@ -33,7 +33,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "internal" | "external" | "response_codes" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "links_analysis" | "duplicates" | "issues";
+type TabKey = "internal" | "external" | "response_codes" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "links_analysis" | "duplicates" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -52,6 +52,7 @@ const TABS: TabDef[] = [
   { key: "custom_extraction", label: "Custom Extraction", icon: <Braces className="h-3 w-3" /> },
   { key: "pagination", label: "Pagination", icon: <Navigation className="h-3 w-3" /> },
   { key: "custom_search", label: "Custom Search", icon: <Search className="h-3 w-3" /> },
+  { key: "content", label: "Content", icon: <FileText className="h-3 w-3" /> },
   { key: "links_analysis", label: "Links", icon: <Network className="h-3 w-3" /> },
   { key: "duplicates", label: "Duplicates", icon: <Copy className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
@@ -148,6 +149,9 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
     { label: "Sequence Error", filter: { pagination_filter: "sequence_error" } },
   ],
   custom_search: [
+    { label: "All", filter: {} },
+  ],
+  content: [
     { label: "All", filter: {} },
   ],
   links_analysis: [
@@ -249,7 +253,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "links_analysis" && activeTab !== "duplicates",
+    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "links_analysis" && activeTab !== "duplicates",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -303,6 +307,20 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-links-analysis", crawlId],
     queryFn: () => urlsApi.linksAnalysis(crawlId),
     enabled: !!crawl && activeTab === "links_analysis" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: linkScoresData } = useQuery<any[]>({
+    queryKey: ["crawl-link-scores", crawlId],
+    queryFn: () => urlsApi.linkScores(crawlId),
+    enabled: !!crawl && activeTab === "links_analysis" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: contentAnalysisData, isLoading: contentLoading } = useQuery<any[]>({
+    queryKey: ["crawl-content-analysis", crawlId],
+    queryFn: () => urlsApi.contentAnalysis(crawlId),
+    enabled: !!crawl && activeTab === "content" && isTerminal,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -521,8 +539,10 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <PaginationAuditTable items={pagItems} loading={pagLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             ) : activeTab === "custom_search" ? (
               <CustomSearchTable items={csItems} loading={csLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
+            ) : activeTab === "content" ? (
+              <ContentAnalysisPanel data={contentAnalysisData} loading={contentLoading} isTerminal={isTerminal} />
             ) : activeTab === "links_analysis" ? (
-              <LinksAnalysisPanel data={linksAnalysisData} loading={linksLoading} isTerminal={isTerminal} />
+              <LinksAnalysisPanel data={linksAnalysisData} loading={linksLoading} isTerminal={isTerminal} linkScores={linkScoresData} />
             ) : activeTab === "duplicates" ? (
               <DuplicatesPanel data={duplicatesData} loading={duplicatesLoading} isTerminal={isTerminal} />
             ) : (
@@ -1216,7 +1236,7 @@ function buildOverviewStats(
 // ─── Links Analysis Panel (F2.10) ─────────────────────────────────────
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function LinksAnalysisPanel({ data, loading, isTerminal }: { data: any; loading: boolean; isTerminal: boolean }) {
+function LinksAnalysisPanel({ data, loading, isTerminal, linkScores }: { data: any; loading: boolean; isTerminal: boolean; linkScores?: any[] }) {
   if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Links analysis available after crawl completes.</div>;
   if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Analyzing internal links...</div>;
   if (!data) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">No link data available.</div>;
@@ -1226,6 +1246,7 @@ function LinksAnalysisPanel({ data, loading, isTerminal }: { data: any; loading:
   const depthDist = data.depth_distribution ?? [];
   const anchorStats = data.anchor_text_stats ?? [];
   const maxInlinks = topPages.length > 0 ? topPages[0].inlink_count : 1;
+  const scores = linkScores ?? [];
 
   return (
     <div className="p-4 space-y-6 overflow-auto">
@@ -1286,6 +1307,34 @@ function LinksAnalysisPanel({ data, loading, isTerminal }: { data: any; loading:
                   <td><span className="truncate block" title={p.url}>{truncateUrl(p.url, 60)}</span></td>
                   <td className="text-gray-500 truncate">{p.title ?? "—"}</td>
                   <td className={`text-right font-mono ${statusCodeColor(p.status_code)}`}>{p.status_code ?? "—"}</td>
+                  <td className="text-right text-gray-500">{p.crawl_depth}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Link Score (PageRank) */}
+      {scores.length > 0 && (
+        <div>
+          <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Link Score (Internal PageRank)</h3>
+          <p className="text-[10px] text-gray-400 mb-2">Higher score = more internal link equity. Scale 1-100.</p>
+          <table className="sf-table w-full">
+            <thead><tr><th style={{ width: "45%" }}>URL</th><th style={{ width: "25%" }}>Title</th><th className="text-right" style={{ width: "15%" }}>Score</th><th className="text-right" style={{ width: "10%" }}>Depth</th></tr></thead>
+            <tbody>
+              {scores.slice(0, 20).map((p: any) => (
+                <tr key={p.id}>
+                  <td><span className="truncate block" title={p.url}>{truncateUrl(p.url, 55)}</span></td>
+                  <td className="text-gray-500 truncate" title={p.title}>{p.title ?? "—"}</td>
+                  <td className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <div className="w-16 bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${p.link_score}%` }} />
+                      </div>
+                      <span className="font-medium text-gray-700 w-6 text-right">{p.link_score}</span>
+                    </div>
+                  </td>
                   <td className="text-right text-gray-500">{p.crawl_depth}</td>
                 </tr>
               ))}
@@ -1367,6 +1416,83 @@ function DuplicatesPanel({ data, loading, isTerminal }: { data: any; loading: bo
           ))}
         </div>
       )}
+    </div>
+  );
+}
+function ContentAnalysisPanel({ data, loading, isTerminal }: { data: any[] | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Content analysis available after crawl completes.</div>;
+  if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Analyzing content...</div>;
+  if (!data || data.length === 0) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">No content analysis data available.</div>;
+
+  const readabilityColor = (score: number | null) => {
+    if (score == null) return "text-gray-400";
+    if (score >= 60) return "text-green-700";
+    if (score >= 30) return "text-amber-600";
+    return "text-red-600";
+  };
+
+  const readabilityLabel = (score: number | null) => {
+    if (score == null) return "N/A";
+    if (score >= 80) return "Very Easy";
+    if (score >= 60) return "Easy";
+    if (score >= 40) return "Standard";
+    if (score >= 20) return "Difficult";
+    return "Very Difficult";
+  };
+
+  const avgReadability = data.reduce((sum, d) => sum + (d.readability_score ?? 0), 0) / data.filter(d => d.readability_score != null).length || 0;
+  const avgTextRatio = data.reduce((sum, d) => sum + (d.text_ratio ?? 0), 0) / data.filter(d => d.text_ratio != null).length || 0;
+  const avgWordCount = data.reduce((sum, d) => sum + (d.word_count ?? 0), 0) / data.length || 0;
+
+  return (
+    <div className="overflow-auto">
+      {/* Summary cards */}
+      <div className="flex gap-3 p-3 border-b border-gray-200">
+        <div className="flex-1 p-2 bg-blue-50 rounded border border-blue-200 text-center">
+          <div className="text-[10px] text-blue-500 uppercase tracking-wide">Avg Readability</div>
+          <div className={`text-lg font-bold ${readabilityColor(avgReadability)}`}>{avgReadability.toFixed(1)}</div>
+          <div className="text-[10px] text-gray-500">{readabilityLabel(avgReadability)}</div>
+        </div>
+        <div className="flex-1 p-2 bg-green-50 rounded border border-green-200 text-center">
+          <div className="text-[10px] text-green-500 uppercase tracking-wide">Avg Text Ratio</div>
+          <div className="text-lg font-bold text-green-700">{(avgTextRatio * 100).toFixed(1)}%</div>
+        </div>
+        <div className="flex-1 p-2 bg-purple-50 rounded border border-purple-200 text-center">
+          <div className="text-[10px] text-purple-500 uppercase tracking-wide">Avg Word Count</div>
+          <div className="text-lg font-bold text-purple-700">{Math.round(avgWordCount)}</div>
+        </div>
+        <div className="flex-1 p-2 bg-gray-50 rounded border border-gray-200 text-center">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wide">Pages Analyzed</div>
+          <div className="text-lg font-bold text-gray-700">{data.length}</div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <table className="w-full text-[11px]">
+        <thead className="bg-gray-50 sticky top-0">
+          <tr className="text-left text-[10px] text-gray-500 uppercase tracking-wider">
+            <th className="px-3 py-1.5 font-medium">URL</th>
+            <th className="px-3 py-1.5 font-medium text-right w-24">Word Count</th>
+            <th className="px-3 py-1.5 font-medium text-right w-24">Text Ratio</th>
+            <th className="px-3 py-1.5 font-medium text-right w-28">Readability</th>
+            <th className="px-3 py-1.5 font-medium text-right w-24">Words/Sentence</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((item: any, i: number) => (
+            <tr key={i} className="border-t border-gray-100 hover:bg-blue-50/40">
+              <td className="px-3 py-1.5 truncate max-w-[400px]" title={item.url}>{truncateUrl(item.url, 60)}</td>
+              <td className="px-3 py-1.5 text-right font-mono">{item.word_count ?? "—"}</td>
+              <td className="px-3 py-1.5 text-right font-mono">{item.text_ratio != null ? `${(item.text_ratio * 100).toFixed(1)}%` : "—"}</td>
+              <td className="px-3 py-1.5 text-right">
+                <span className={`font-mono ${readabilityColor(item.readability_score)}`}>{item.readability_score != null ? item.readability_score.toFixed(1) : "—"}</span>
+                {item.readability_score != null && <span className="ml-1 text-[9px] text-gray-400">{readabilityLabel(item.readability_score)}</span>}
+              </td>
+              <td className="px-3 py-1.5 text-right font-mono">{item.avg_words_per_sentence != null ? item.avg_words_per_sentence.toFixed(1) : "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
