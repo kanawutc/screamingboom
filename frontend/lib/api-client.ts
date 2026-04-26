@@ -350,6 +350,9 @@ export const urlsApi = {
   structuredDataValidation: (crawlId: string, limit = 200) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/structured-data-validation${qs({ limit })}`),
+
+  auditReportUrl: (crawlId: string) =>
+    `${API_BASE}/crawls/${crawlId}/audit-report`,
 };
 
 export const extractionRulesApi = {

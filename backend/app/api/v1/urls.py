@@ -1163,3 +1163,214 @@ async def get_sitemap_analysis(
         "urls_in_sitemap_not_crawled": in_sitemap_not_crawled[:200],
         "urls_in_crawl_not_sitemap": in_crawl_not_sitemap[:200],
     }
+
+
+@router.get("/crawls/{crawl_id}/audit-report")
+async def get_audit_report_html(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+) -> StreamingResponse:
+    """Generate a styled HTML audit report for printing/PDF export."""
+    from html import escape
+
+    repo = UrlRepository(db)
+
+    # Gather data
+    health = await repo.get_health_score(crawl_id)
+    overview = await repo.get_overview_stats(crawl_id)
+    quick_wins = await repo.get_quick_wins(crawl_id)
+    perf = await repo.get_performance_stats(crawl_id)
+
+    from app.repositories.issue_repo import IssueRepository
+
+    issue_repo = IssueRepository(db)
+    issue_summary = await issue_repo.get_summary(crawl_id)
+
+    # Get crawl info
+    from sqlalchemy import text
+
+    result = await db.execute(
+        text("SELECT c.*, p.name as project_name, p.domain FROM crawls c JOIN projects p ON p.id = c.project_id WHERE c.id = :cid"),
+        {"cid": str(crawl_id)},
+    )
+    crawl_row = result.first()
+    project_name = crawl_row.project_name if crawl_row else "Unknown"
+    domain = crawl_row.domain if crawl_row else ""
+
+    score = health.get("score", 0)
+    grade = health.get("grade", "?")
+    metrics = health.get("metrics", {})
+    components = health.get("components", {})
+
+    # Grade color
+    grade_colors = {
+        "A+": "#10b981", "A": "#10b981", "A-": "#22c55e",
+        "B+": "#84cc16", "B": "#84cc16", "B-": "#eab308",
+        "C+": "#eab308", "C": "#f97316", "C-": "#f97316",
+        "D": "#ef4444", "F": "#dc2626",
+    }
+    grade_color = grade_colors.get(grade, "#6b7280")
+
+    by_sev = issue_summary.by_severity or {} if issue_summary else {}
+    by_cat = issue_summary.by_category or {} if issue_summary else {}
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    perf_stats = perf.get("stats", {})
+
+    # Build HTML
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEO Audit Report — {escape(domain)}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ font-family: 'Inter', -apple-system, sans-serif; color: #1a1a2e; background: #fff; line-height: 1.5; }}
+  .container {{ max-width: 800px; margin: 0 auto; padding: 40px 32px; }}
+  .header {{ text-align: center; margin-bottom: 40px; border-bottom: 2px solid #e5e7eb; padding-bottom: 24px; }}
+  .header h1 {{ font-size: 24px; font-weight: 700; margin-bottom: 4px; }}
+  .header .domain {{ font-size: 16px; color: #6b7280; }}
+  .header .date {{ font-size: 12px; color: #9ca3af; margin-top: 4px; }}
+  .score-card {{ display: flex; align-items: center; justify-content: center; gap: 32px; margin: 32px 0; padding: 24px; background: #f9fafb; border-radius: 12px; }}
+  .score-circle {{ width: 96px; height: 96px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-weight: 700; }}
+  .score-circle .grade {{ font-size: 28px; }}
+  .score-circle .number {{ font-size: 14px; opacity: 0.9; }}
+  .score-components {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }}
+  .component {{ font-size: 13px; }}
+  .component .label {{ color: #6b7280; }}
+  .component .value {{ font-weight: 600; }}
+  .section {{ margin-top: 32px; }}
+  .section h2 {{ font-size: 18px; font-weight: 600; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }}
+  .metrics-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }}
+  .metric {{ text-align: center; padding: 16px; background: #f9fafb; border-radius: 8px; }}
+  .metric .value {{ font-size: 24px; font-weight: 700; }}
+  .metric .label {{ font-size: 12px; color: #6b7280; margin-top: 2px; }}
+  .issues-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }}
+  .issue-badge {{ text-align: center; padding: 12px; border-radius: 8px; }}
+  .issue-badge .count {{ font-size: 20px; font-weight: 700; }}
+  .issue-badge .label {{ font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }}
+  .critical {{ background: #fef2f2; color: #dc2626; }}
+  .warning {{ background: #fffbeb; color: #d97706; }}
+  .info {{ background: #eff6ff; color: #2563eb; }}
+  .opportunity {{ background: #f0fdf4; color: #16a34a; }}
+  .category-table {{ width: 100%; border-collapse: collapse; }}
+  .category-table th, .category-table td {{ text-align: left; padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #f3f4f6; }}
+  .category-table th {{ font-weight: 600; background: #f9fafb; }}
+  .wins-list {{ list-style: none; }}
+  .wins-list li {{ padding: 8px 12px; border-left: 3px solid; margin-bottom: 6px; font-size: 13px; border-radius: 0 4px 4px 0; background: #f9fafb; }}
+  .wins-list .high {{ border-color: #dc2626; }}
+  .wins-list .medium {{ border-color: #f59e0b; }}
+  .wins-list .low {{ border-color: #3b82f6; }}
+  .footer {{ margin-top: 40px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 11px; color: #9ca3af; }}
+  @media print {{
+    body {{ font-size: 12px; }}
+    .container {{ padding: 0; }}
+    .score-card {{ break-inside: avoid; }}
+    .section {{ break-inside: avoid; }}
+  }}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>SEO Audit Report</h1>
+    <div class="domain">{escape(project_name)} — {escape(domain)}</div>
+    <div class="date">Generated: {now} | Crawl ID: {crawl_id}</div>
+  </div>
+
+  <div class="score-card">
+    <div class="score-circle" style="background: {grade_color}">
+      <div class="grade">{grade}</div>
+      <div class="number">{score}/100</div>
+    </div>
+    <div class="score-components">
+      <div class="component"><span class="label">Status Codes:</span> <span class="value">{components.get('status_codes', 0)}/100</span></div>
+      <div class="component"><span class="label">Indexability:</span> <span class="value">{components.get('indexability', 0)}/100</span></div>
+      <div class="component"><span class="label">Issues:</span> <span class="value">{components.get('issues', 0)}/100</span></div>
+      <div class="component"><span class="label">Performance:</span> <span class="value">{components.get('performance', 0)}/100</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Crawl Overview</h2>
+    <div class="metrics-grid">
+      <div class="metric"><div class="value">{metrics.get('total_urls', 0)}</div><div class="label">Total URLs</div></div>
+      <div class="metric"><div class="value">{metrics.get('ok_urls', 0)}</div><div class="label">OK (2xx)</div></div>
+      <div class="metric"><div class="value" style="color: #f59e0b">{metrics.get('redirect_urls', 0)}</div><div class="label">Redirects (3xx)</div></div>
+      <div class="metric"><div class="value" style="color: #dc2626">{metrics.get('error_urls', 0)}</div><div class="label">Errors (4xx/5xx)</div></div>
+      <div class="metric"><div class="value">{metrics.get('indexable_urls', 0)}</div><div class="label">Indexable</div></div>
+      <div class="metric"><div class="value">{metrics.get('avg_response_ms', 0)}ms</div><div class="label">Avg Response</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Issues Summary</h2>
+    <div class="issues-grid">
+      <div class="issue-badge critical"><div class="count">{by_sev.get('critical', 0)}</div><div class="label">Critical</div></div>
+      <div class="issue-badge warning"><div class="count">{by_sev.get('warning', 0)}</div><div class="label">Warning</div></div>
+      <div class="issue-badge info"><div class="count">{by_sev.get('info', 0)}</div><div class="label">Info</div></div>
+      <div class="issue-badge opportunity"><div class="count">{by_sev.get('opportunity', 0)}</div><div class="label">Opportunity</div></div>
+    </div>"""
+
+    # Issues by category table
+    if by_cat:
+        html += """
+    <table class="category-table">
+      <thead><tr><th>Category</th><th>Count</th></tr></thead>
+      <tbody>"""
+        for cat, count in sorted(by_cat.items(), key=lambda x: x[1], reverse=True):
+            html += f"""
+        <tr><td>{escape(cat)}</td><td>{count}</td></tr>"""
+        html += """
+      </tbody>
+    </table>"""
+
+    html += """
+  </div>"""
+
+    # Performance
+    if perf_stats.get("total"):
+        html += f"""
+  <div class="section">
+    <h2>Performance</h2>
+    <div class="metrics-grid">
+      <div class="metric"><div class="value">{perf_stats.get('avg_ms', 0)}ms</div><div class="label">Average</div></div>
+      <div class="metric"><div class="value">{perf_stats.get('p50_ms', 0)}ms</div><div class="label">Median (P50)</div></div>
+      <div class="metric"><div class="value">{perf_stats.get('p95_ms', 0)}ms</div><div class="label">P95</div></div>
+      <div class="metric"><div class="value" style="color: #f59e0b">{perf_stats.get('slow_count', 0)}</div><div class="label">Slow (>1s)</div></div>
+      <div class="metric"><div class="value" style="color: #dc2626">{perf_stats.get('very_slow_count', 0)}</div><div class="label">Very Slow (>3s)</div></div>
+      <div class="metric"><div class="value">{perf_stats.get('max_ms', 0)}ms</div><div class="label">Slowest</div></div>
+    </div>
+  </div>"""
+
+    # Quick Wins
+    if quick_wins:
+        html += """
+  <div class="section">
+    <h2>Recommended Actions</h2>
+    <ul class="wins-list">"""
+        for w in quick_wins[:15]:
+            priority = w.get("priority", "medium")
+            html += f"""
+      <li class="{priority}"><strong>[{escape(priority.upper())}]</strong> {escape(w.get('action', ''))}</li>"""
+        html += """
+    </ul>
+  </div>"""
+
+    html += f"""
+  <div class="footer">
+    <p>Generated by SEO Spider &mdash; Self-hosted SEO Auditing Tool</p>
+    <p>Crawl ID: {crawl_id} | {now}</p>
+  </div>
+</div>
+</body>
+</html>"""
+
+    return StreamingResponse(
+        io.StringIO(html),
+        media_type="text/html",
+        headers={"Content-Disposition": f'inline; filename="seo-audit-{crawl_id}.html"'},
+    )

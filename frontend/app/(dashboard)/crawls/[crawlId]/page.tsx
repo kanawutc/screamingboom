@@ -869,7 +869,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
             ) : activeTab === "keywords" ? (
               <KeywordsPanel data={keywordsData} loading={keywordsLoading} isTerminal={isTerminal} />
             ) : activeTab === "report" ? (
-              <ReportPanel data={reportData} loading={reportLoading} isTerminal={isTerminal} />
+              <ReportPanel data={reportData} loading={reportLoading} isTerminal={isTerminal} crawlId={crawlId} />
             ) : activeTab === "link_graph" ? (
               <LinkGraphPanel data={linkGraphData} loading={linkGraphLoading} isTerminal={isTerminal} />
             ) : activeTab === "orphan_pages" ? (
@@ -4276,7 +4276,7 @@ function LinkGraphPanel({ data, loading, isTerminal }: { data: any | undefined; 
 }
 
 // ─── Report Panel ───────────────────────────────────────────────────────
-function ReportPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+function ReportPanel({ data, loading, isTerminal, crawlId }: { data: any | undefined; loading: boolean; isTerminal: boolean; crawlId: string }) {
   if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Report available after crawl completes</div>;
   if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Generating report...</div>;
   if (!data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No report data</div>;
@@ -4335,13 +4335,24 @@ function ReportPanel({ data, loading, isTerminal }: { data: any | undefined; loa
             </p>
           </div>
         </div>
-        <button
-          onClick={handleExportText}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-        >
-          <Download className="h-3.5 w-3.5" />
-          Export
-        </button>
+        <div className="flex items-center gap-2">
+          <a
+            href={urlsApi.auditReportUrl(crawlId)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#6cc04a] rounded-md hover:bg-[#5aaa3c] transition-colors"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            HTML Report
+          </a>
+          <button
+            onClick={handleExportText}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Text
+          </button>
+        </div>
       </div>
 
       {/* Score Bar */}
