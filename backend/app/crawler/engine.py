@@ -663,6 +663,18 @@ class CrawlEngine:
         except Exception:
             pass  # Non-critical: don't fail crawl for pub/sub error
 
+        # Also update DB periodically so API queries show progress
+        try:
+            async with self._pool.acquire() as conn:
+                await conn.execute(
+                    "UPDATE crawls SET crawled_urls_count = $1, error_count = $2 WHERE id = $3",
+                    self._stats.crawled_count,
+                    self._stats.error_count,
+                    self._crawl_id,
+                )
+        except Exception:
+            pass
+
     async def _update_crawl_status(self, status: str, error_msg: str | None = None) -> None:
         """Update crawl record in database."""
         try:
