@@ -14,6 +14,26 @@ export type CrawlMode = "spider" | "list";
 
 export type IssueSeverity = "critical" | "warning" | "info" | "opportunity";
 
+// ─── Custom Rules ────────────────────────────────────────────────────
+export type ExtractionMethod = "xpath" | "css" | "regex";
+export type ExtractType = "text" | "html" | "inner_html" | "attribute";
+
+export interface CustomExtractorCreate {
+  name: string;
+  method: ExtractionMethod;
+  selector: string;
+  extract_type?: ExtractType;
+  attribute_name?: string | null;
+}
+
+export interface CustomSearchCreate {
+  name: string;
+  pattern: string;
+  is_regex?: boolean;
+  case_sensitive?: boolean;
+  contains?: boolean;
+}
+
 // ─── Pagination ──────────────────────────────────────────────────────
 export interface CursorPage<T> {
   items: T[];
@@ -53,6 +73,9 @@ export interface CrawlConfig {
   respect_robots: boolean;
   include_patterns: string[];
   exclude_patterns: string[];
+  url_rewrites: { pattern: string; replacement: string }[];
+  strip_query_params: string[];
+  render_js: boolean;
 }
 
 export const DEFAULT_CRAWL_CONFIG: CrawlConfig = {
@@ -64,6 +87,9 @@ export const DEFAULT_CRAWL_CONFIG: CrawlConfig = {
   respect_robots: true,
   include_patterns: [],
   exclude_patterns: [],
+  url_rewrites: [],
+  strip_query_params: [],
+  render_js: false,
 };
 
 // ─── Crawl ───────────────────────────────────────────────────────────
@@ -100,6 +126,8 @@ export interface CrawlCreate {
   mode: CrawlMode;
   urls?: string[];
   config?: Partial<CrawlConfig>;
+  custom_extractors?: CustomExtractorCreate[];
+  custom_searches?: CustomSearchCreate[];
 }
 
 // ─── Crawled URL ─────────────────────────────────────────────────────
@@ -286,6 +314,12 @@ export interface PaginationItem {
   rel_prev: string | null;
   is_indexable: boolean;
   indexability_reason: string | null;
+}
+
+export interface CustomSearchItem {
+  url_id: string;
+  url: string;
+  search_results: Record<string, number>;
 }
 
 // ─── Crawl Comparison ────────────────────────────────────────────────

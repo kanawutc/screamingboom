@@ -8,7 +8,7 @@ import uuid
 import structlog
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 
-from app.api.deps import DbSession, RedisClient
+from app.api.deps import AsyncpgPool, DbSession, RedisClient
 from app.schemas.crawl import CrawlContinue, CrawlCreate, CrawlResponse, CrawlSummary
 from app.schemas.pagination import CursorPage
 from app.services.crawl_service import CrawlService
@@ -34,6 +34,7 @@ async def start_crawl(
     data: CrawlCreate,
     db: DbSession,
     redis: RedisClient,
+    pool: AsyncpgPool,
 ) -> CrawlResponse:
     """Start a new crawl for a project. Creates the record and enqueues the ARQ job."""
     # Verify project exists
@@ -44,7 +45,7 @@ async def start_crawl(
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    svc = CrawlService(db, redis)
+    svc = CrawlService(db, redis, pool=pool)
     crawl = await svc.start_crawl(project_id, data)
     return CrawlResponse.model_validate(crawl)
 

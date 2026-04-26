@@ -85,6 +85,7 @@ class PageData:
     indexability_reason: str | None = None
     word_count: int = 0
     content_hash: bytes = b""
+    simhash: int = 0  # 64-bit SimHash fingerprint for near-duplicate detection
     links: list[LinkData] = field(default_factory=list)
     images: list[ImageData] = field(default_factory=list)
     hreflang_tags: list[HreflangData] = field(default_factory=list)
@@ -105,6 +106,7 @@ class PageData:
 
     # Phase 3E: Custom extraction rules results
     custom_extractions: dict = field(default_factory=dict)
+    custom_search_results: dict = field(default_factory=dict)
 
 
 class ParserPool:
@@ -121,7 +123,8 @@ class ParserPool:
         html_content: bytes | str,
         base_url: str,
         content_type_header: str | None = None,
-        extraction_rules: list[dict] | None = None,
+        custom_extractors: list[dict] | None = None,
+        custom_searches: list[dict] | None = None,
     ) -> PageData:
         """Parse HTML and extract all SEO-relevant data.
 
@@ -129,6 +132,8 @@ class ParserPool:
             html_content: Raw HTML bytes or string.
             base_url: The URL this page was fetched from (for resolving relative URLs).
             content_type_header: Content-Type header value (for charset detection).
+            custom_extractors: List of dicts representing extraction rules.
+            custom_searches: List of dicts representing search rules.
 
         Returns:
             PageData dataclass with all extracted fields.
@@ -167,9 +172,11 @@ class ParserPool:
         # Determine indexability from robots meta
         self._determine_indexability(data)
 
-        # Phase 3E: Apply custom extraction rules
-        if extraction_rules:
-            self._apply_custom_extractions(tree, html_str, data, extraction_rules)
+        # Phase 3E: Apply custom rules
+        if custom_extractors:
+            self._apply_custom_extractions(tree, html_str, data, custom_extractors)
+        if custom_searches:
+            self._apply_custom_searches(html_str, data, custom_searches)
 
         return data
 
@@ -478,6 +485,12 @@ class ParserPool:
         full_text = _WS_RE.sub(" ", full_text).strip()
         data.word_count = len(full_text.split()) if full_text else 0
 
+        # Compute SimHash for near-duplicate detection (skip very short pages)
+        if full_text and data.word_count >= 50:
+            from app.analysis.simhash import simhash
+
+            data.simhash = simhash(full_text)
+
     def _compute_content_hash(self, html_str: str, data: PageData) -> None:
         """MD5 hash of normalized HTML for exact-duplicate detection."""
         # Normalize: collapse whitespace, lowercase for more robust dedup
@@ -529,23 +542,25 @@ class ParserPool:
     ) -> None:
         for rule in rules:
             name = rule.get("name", "")
+            method = rule.get("method", "css")
             selector = rule.get("selector", "")
-            selector_type = rule.get("selector_type", "css")
             extract_type = rule.get("extract_type", "text")
             attribute_name = rule.get("attribute_name", "")
+            extractor_id = str(rule.get("id", ""))
 
             if not name or not selector:
                 continue
 
             try:
-                if selector_type == "xpath":
-                    data.custom_extractions[name] = self._extract_xpath(
-                        html_str, selector, extract_type, attribute_name
-                    )
+                if method == "xpath":
+                    result = self._extract_xpath(html_str, selector, extract_type, attribute_name)
+                elif method == "regex":
+                    result = self._extract_regex(html_str, selector)
                 else:
-                    data.custom_extractions[name] = self._extract_css(
-                        tree, selector, extract_type, attribute_name
-                    )
+                    result = self._extract_css(tree, selector, extract_type, attribute_name)
+                
+                # Store full dict so inserter can join by extractor_id
+                data.custom_extractions[extractor_id] = result
             except Exception as exc:
                 logger.debug(
                     "custom_extraction_failed",
@@ -553,7 +568,56 @@ class ParserPool:
                     selector=selector,
                     error=str(exc),
                 )
-                data.custom_extractions[name] = None
+                data.custom_extractions[extractor_id] = None
+
+    def _extract_regex(self, html_str: str, pattern: str) -> str | None:
+        """Extract using standard Python regex."""
+        try:
+            match = re.search(pattern, html_str)
+            if match:
+                # If there are capture groups return the first one, else full match
+                return match.group(1) if match.lastindex else match.group(0)
+            return None
+        except re.error:
+            return None
+
+    def _apply_custom_searches(
+        self,
+        html_str: str,
+        data: PageData,
+        searches: list[dict],
+    ) -> None:
+        for search in searches:
+            search_id = str(search.get("id", ""))
+            pattern = search.get("pattern", "")
+            is_regex = search.get("is_regex", False)
+            case_sensitive = search.get("case_sensitive", False)
+            contains = search.get("contains", True)
+
+            if not pattern:
+                continue
+
+            try:
+                flags = 0 if case_sensitive else re.IGNORECASE
+                if is_regex:
+                    matches = re.findall(pattern, html_str, flags=flags)
+                    found_count = len(matches)
+                else:
+                    # Literal string search
+                    target = html_str if case_sensitive else html_str.lower()
+                    query = pattern if case_sensitive else pattern.lower()
+                    found_count = target.count(query)
+
+                # Store result
+                data.custom_search_results[search_id] = found_count
+            except Exception as exc:
+                logger.debug(
+                    "custom_search_failed",
+                    search_id=search_id,
+                    pattern=pattern,
+                    error=str(exc),
+                )
+                data.custom_search_results[search_id] = 0
 
     def _extract_css(
         self,

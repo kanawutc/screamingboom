@@ -18,6 +18,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        INSTALL_PLAYWRIGHT: "1"
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:changeme@db:5432/seo_spider
       - REDIS_URL=redis://redis:6379
@@ -28,7 +30,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -39,7 +41,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: ["python", "-m", "arq", "app.worker.settings.WorkerSettings"]
+      args:
+        INSTALL_PLAYWRIGHT: "1"
+    command: [ "python", "-m", "arq", "app.worker.settings.WorkerSettings" ]
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:changeme@db:5432/seo_spider
       - REDIS_URL=redis://redis:6379
@@ -57,7 +61,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: ["alembic", "upgrade", "head"]
+    command: [ "alembic", "upgrade", "head" ]
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:changeme@db:5432/seo_spider
     depends_on:
@@ -81,7 +85,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/app/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -94,7 +98,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -116,6 +120,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+
 
 networks:
   app-network:

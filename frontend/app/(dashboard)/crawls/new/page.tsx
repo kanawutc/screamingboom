@@ -14,10 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { projectsApi, crawlsApi, extractionRulesApi } from "@/lib/api-client";
-import type { CrawlMode, CrawlConfig, Project, ExtractionRule, ExtractionRuleCreate } from "@/types";
+import { projectsApi, crawlsApi } from "@/lib/api-client";
+import type { CrawlMode, CrawlConfig, Project, CustomExtractorCreate, CustomSearchCreate } from "@/types";
 import { DEFAULT_CRAWL_CONFIG } from "@/types";
-import { Plus, Trash2, Braces } from "lucide-react";
+import { Plus, Trash2, Braces, Search } from "lucide-react";
 
 const UA_PRESETS: Record<string, string> = {
   default: "SEOSpider/1.0",
@@ -71,7 +71,8 @@ export default function NewCrawlPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [localRules, setLocalRules] = useState<ExtractionRuleCreate[]>([]);
+  const [localExtractors, setLocalExtractors] = useState<CustomExtractorCreate[]>([]);
+  const [localSearches, setLocalSearches] = useState<CustomSearchCreate[]>([]);
 
   // Fetch or create default project
   const { data: projectsData } = useQuery({
@@ -130,17 +131,16 @@ export default function NewCrawlPage() {
           });
         }
 
-        // Save extraction rules to project before starting crawl
-        const validRules = localRules.filter((r) => r.name.trim() && r.selector.trim());
-        for (const rule of validRules) {
-          await extractionRulesApi.create(project.id, rule);
-        }
+        const validExtractors = localExtractors.filter((r) => r.name.trim() && r.selector.trim());
+        const validSearches = localSearches.filter((s) => s.name.trim() && s.pattern.trim());
 
         const crawl = await crawlsApi.start(project.id, {
           start_url: urls[0],
           mode: "list",
           urls,
           config,
+          custom_extractors: validExtractors,
+          custom_searches: validSearches,
         });
 
         return crawl;
@@ -169,15 +169,15 @@ export default function NewCrawlPage() {
       }
 
       // Save extraction rules to project before starting crawl
-      const validRules = localRules.filter((r) => r.name.trim() && r.selector.trim());
-      for (const rule of validRules) {
-        await extractionRulesApi.create(project.id, rule);
-      }
+      const validExtractors = localExtractors.filter((r) => r.name.trim() && r.selector.trim());
+      const validSearches = localSearches.filter((s) => s.name.trim() && s.pattern.trim());
 
       const crawl = await crawlsApi.start(project.id, {
         start_url: url,
         mode,
         config,
+        custom_extractors: validExtractors,
+        custom_searches: validSearches,
       });
 
       return crawl;
@@ -199,19 +199,34 @@ export default function NewCrawlPage() {
     updateConfig({ user_agent: UA_PRESETS[preset] ?? UA_PRESETS.default });
   };
 
-  const addRule = () => {
-    setLocalRules((prev) => [
+  const addExtractor = () => {
+    setLocalExtractors((prev) => [
       ...prev,
-      { name: "", selector: "", selector_type: "css", extract_type: "text", attribute_name: null },
+      { name: "", selector: "", method: "css", extract_type: "text", attribute_name: null },
     ]);
   };
 
-  const updateRule = (index: number, partial: Partial<ExtractionRuleCreate>) => {
-    setLocalRules((prev) => prev.map((r, i) => (i === index ? { ...r, ...partial } : r)));
+  const updateExtractor = (index: number, partial: Partial<CustomExtractorCreate>) => {
+    setLocalExtractors((prev) => prev.map((r, i) => (i === index ? { ...r, ...partial } : r)));
   };
 
-  const removeRule = (index: number) => {
-    setLocalRules((prev) => prev.filter((_, i) => i !== index));
+  const removeExtractor = (index: number) => {
+    setLocalExtractors((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addSearch = () => {
+    setLocalSearches((prev) => [
+      ...prev,
+      { name: "", pattern: "", is_regex: false, case_sensitive: false, contains: true },
+    ]);
+  };
+
+  const updateSearch = (index: number, partial: Partial<CustomSearchCreate>) => {
+    setLocalSearches((prev) => prev.map((s, i) => (i === index ? { ...s, ...partial } : s)));
+  };
+
+  const removeSearch = (index: number) => {
+    setLocalSearches((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -390,6 +405,101 @@ export default function NewCrawlPage() {
         </CardContent>
       </Card>
 
+      {/* URL Filtering */}
+      <Card>
+        <CardHeader>
+          <CardTitle>URL Filtering & Rewriting</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">
+                Include Patterns
+              </label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                placeholder={"*/blog/*\n*/products/*"}
+                value={config.include_patterns.join("\n")}
+                onChange={(e) =>
+                  updateConfig({
+                    include_patterns: e.target.value
+                      .split("\n")
+                      .map((l) => l.trim())
+                      .filter((l) => l.length > 0),
+                  })
+                }
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Only crawl URLs matching these glob patterns. Leave empty to crawl all.
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">
+                Exclude Patterns
+              </label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                placeholder={"*/tag/*\n*/page/*\n*.pdf"}
+                value={config.exclude_patterns.join("\n")}
+                onChange={(e) =>
+                  updateConfig({
+                    exclude_patterns: e.target.value
+                      .split("\n")
+                      .map((l) => l.trim())
+                      .filter((l) => l.length > 0),
+                  })
+                }
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Skip URLs matching these glob patterns.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-1 block">
+              Strip Query Parameters
+            </label>
+            <Input
+              placeholder="utm_source, utm_medium, fbclid, ref (comma-separated)"
+              value={config.strip_query_params.join(", ")}
+              onChange={(e) =>
+                updateConfig({
+                  strip_query_params: e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter((s) => s.length > 0),
+                })
+              }
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Remove these query parameters from URLs before crawling to reduce duplicates.
+            </p>
+          </div>
+
+          {/* JS Rendering Toggle */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="render-js"
+              checked={config.render_js}
+              onChange={(e) =>
+                updateConfig({ render_js: e.target.checked })
+              }
+              className="rounded"
+            />
+            <label htmlFor="render-js" className="text-sm font-medium">
+              Enable JavaScript Rendering
+            </label>
+            <span className="text-xs text-muted-foreground">
+              (Uses headless Chrome — slower but captures dynamic content)
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Custom Extraction Rules */}
       <Card>
         <CardHeader>
@@ -398,36 +508,36 @@ export default function NewCrawlPage() {
               <Braces className="h-4 w-4" />
               Custom Extraction Rules
             </CardTitle>
-            <Button variant="outline" size="sm" onClick={addRule} className="gap-1">
+            <Button variant="outline" size="sm" onClick={addExtractor} className="gap-1">
               <Plus className="h-3.5 w-3.5" />
               Add Rule
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {localRules.length === 0 ? (
+          {localExtractors.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No extraction rules configured. Add rules to extract custom data from each crawled page using CSS selectors or XPath.
+              No extraction rules configured. Add rules to extract custom data from each crawled page using CSS selectors, XPath, or Regex.
             </p>
           ) : (
-            localRules.map((rule, i) => (
+            localExtractors.map((extractor, i) => (
               <div key={i} className="flex items-start gap-2 p-3 rounded-md border border-gray-200 bg-gray-50">
                 <div className="flex-1 grid grid-cols-2 gap-2">
                   <Input
                     placeholder="Rule name (e.g. price)"
-                    value={rule.name}
-                    onChange={(e) => updateRule(i, { name: e.target.value })}
+                    value={extractor.name}
+                    onChange={(e) => updateExtractor(i, { name: e.target.value })}
                     className="text-sm"
                   />
                   <Input
-                    placeholder={rule.selector_type === "css" ? "CSS selector (e.g. .price)" : "XPath (e.g. //h1)"}
-                    value={rule.selector}
-                    onChange={(e) => updateRule(i, { selector: e.target.value })}
+                    placeholder={extractor.method === "css" ? "CSS selector (e.g. .price)" : extractor.method === "xpath" ? "XPath (e.g. //h1)" : "Regex (e.g. \\d+)"}
+                    value={extractor.selector}
+                    onChange={(e) => updateExtractor(i, { selector: e.target.value })}
                     className="text-sm font-mono"
                   />
                   <Select
-                    value={rule.selector_type}
-                    onValueChange={(v) => updateRule(i, { selector_type: v as "css" | "xpath" })}
+                    value={extractor.method}
+                    onValueChange={(v) => updateExtractor(i, { method: v as "css" | "xpath" | "regex" })}
                   >
                     <SelectTrigger className="text-sm">
                       <SelectValue />
@@ -435,27 +545,28 @@ export default function NewCrawlPage() {
                     <SelectContent>
                       <SelectItem value="css">CSS Selector</SelectItem>
                       <SelectItem value="xpath">XPath</SelectItem>
+                      <SelectItem value="regex">Regex</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select
-                    value={rule.extract_type}
-                    onValueChange={(v) => updateRule(i, { extract_type: v as "text" | "html" | "attribute" | "count" })}
+                    value={extractor.extract_type || "text"}
+                    onValueChange={(v) => updateExtractor(i, { extract_type: v as "text" | "html" | "inner_html" | "attribute" })}
                   >
                     <SelectTrigger className="text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="text">Inner Text</SelectItem>
-                      <SelectItem value="html">Inner HTML</SelectItem>
+                      <SelectItem value="inner_html">Inner HTML</SelectItem>
+                      <SelectItem value="html">Outer HTML</SelectItem>
                       <SelectItem value="attribute">Attribute Value</SelectItem>
-                      <SelectItem value="count">Element Count</SelectItem>
                     </SelectContent>
                   </Select>
-                  {rule.extract_type === "attribute" && (
+                  {extractor.extract_type === "attribute" && (
                     <Input
                       placeholder="Attribute name (e.g. href)"
-                      value={rule.attribute_name ?? ""}
-                      onChange={(e) => updateRule(i, { attribute_name: e.target.value || null })}
+                      value={extractor.attribute_name ?? ""}
+                      onChange={(e) => updateExtractor(i, { attribute_name: e.target.value || null })}
                       className="text-sm font-mono col-span-2"
                     />
                   )}
@@ -463,7 +574,92 @@ export default function NewCrawlPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => removeRule(i)}
+                  onClick={() => removeExtractor(i)}
+                  className="text-gray-400 hover:text-red-500 mt-0.5"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Custom Search Rules */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Custom Searches
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={addSearch} className="gap-1">
+              <Plus className="h-3.5 w-3.5" />
+              Add Search
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {localSearches.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No search rules configured. Add rules to find specific text or patterns in the raw HTML of each page.
+            </p>
+          ) : (
+            localSearches.map((search, i) => (
+              <div key={i} className="flex items-start gap-2 p-3 rounded-md border border-gray-200 bg-gray-50">
+                <div className="flex-1 grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="Search name (e.g. Google Analytics)"
+                    value={search.name}
+                    onChange={(e) => updateSearch(i, { name: e.target.value })}
+                    className="text-sm"
+                  />
+                  <Input
+                    placeholder={search.is_regex ? "Regex pattern (e.g. UA-\\d+)" : "Literal text (e.g. GTM-XXXXX)"}
+                    value={search.pattern}
+                    onChange={(e) => updateSearch(i, { pattern: e.target.value })}
+                    className="text-sm font-mono"
+                  />
+                  <div className="col-span-2 flex items-center gap-4 text-sm mt-1">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={search.is_regex}
+                        onChange={(e) => updateSearch(i, { is_regex: e.target.checked })}
+                        className="rounded"
+                      />
+                      Regex
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={search.case_sensitive}
+                        onChange={(e) => updateSearch(i, { case_sensitive: e.target.checked })}
+                        className="rounded"
+                      />
+                      Case Sensitive
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer ml-auto">
+                      <span>Flag if:</span>
+                      <Select
+                        value={search.contains ? "contains" : "does_not_contain"}
+                        onValueChange={(v) => updateSearch(i, { contains: v === "contains" })}
+                      >
+                        <SelectTrigger className="h-8 w-36 text-xs bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="text-xs">
+                          <SelectItem value="contains">Found</SelectItem>
+                          <SelectItem value="does_not_contain">Not Found</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </label>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeSearch(i)}
                   className="text-gray-400 hover:text-red-500 mt-0.5"
                 >
                   <Trash2 className="h-3.5 w-3.5" />

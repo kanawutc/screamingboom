@@ -5,14 +5,15 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { StatusBadge } from "@/components/crawl/StatusBadge";
 import { crawlsApi, urlsApi, issuesApi } from "@/lib/api-client";
+import SerpPreview from "@/components/crawl/SerpPreview";
 import { useCrawlWebSocket } from "@/hooks/use-crawl-websocket";
 import { useCrawlStore } from "@/stores/crawl-store";
-import type { Crawl, CrawledUrl, CrawlStatus, Issue, IssueSeverity, CrawledUrlDetail, PageLink, ExternalLink as ExternalLinkData, StructuredDataItem, CustomExtractionItem, PaginationItem } from "@/types";
+import type { Crawl, CrawledUrl, CrawlStatus, Issue, IssueSeverity, CrawledUrlDetail, PageLink, ExternalLink as ExternalLinkData, StructuredDataItem, CustomExtractionItem, PaginationItem, CustomSearchItem } from "@/types";
 import {
   Pause, Play, Square, Trash2, ArrowLeft, ExternalLink as ExternalLinkIcon, Globe,
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
   X, Download, Search, Link2, Shield, Navigation, FileCode2, Sheet, Braces,
-  FastForward,
+  FastForward, Network, Copy,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -32,7 +33,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "internal" | "external" | "response_codes" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "issues";
+type TabKey = "internal" | "external" | "response_codes" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "links_analysis" | "duplicates" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -50,6 +51,9 @@ const TABS: TabDef[] = [
   { key: "structured_data", label: "Structured Data", icon: <FileCode2 className="h-3 w-3" /> },
   { key: "custom_extraction", label: "Custom Extraction", icon: <Braces className="h-3 w-3" /> },
   { key: "pagination", label: "Pagination", icon: <Navigation className="h-3 w-3" /> },
+  { key: "custom_search", label: "Custom Search", icon: <Search className="h-3 w-3" /> },
+  { key: "links_analysis", label: "Links", icon: <Network className="h-3 w-3" /> },
+  { key: "duplicates", label: "Duplicates", icon: <Copy className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -142,6 +146,15 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
     { label: "Multiple", filter: { pagination_filter: "multiple" } },
     { label: "Loop", filter: { pagination_filter: "loop" } },
     { label: "Sequence Error", filter: { pagination_filter: "sequence_error" } },
+  ],
+  custom_search: [
+    { label: "All", filter: {} },
+  ],
+  links_analysis: [
+    { label: "All", filter: {} },
+  ],
+  duplicates: [
+    { label: "All", filter: {} },
   ],
   issues: [
     { label: "All", filter: {} },
@@ -236,7 +249,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination",
+    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "links_analysis" && activeTab !== "duplicates",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -259,8 +272,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
   });
 
   const { data: ceData, isLoading: ceLoading } = useQuery({
-    queryKey: ["crawl-custom-extractions", crawlId, ceCursor],
-    queryFn: () => urlsApi.customExtractions(crawlId, ceCursor, 50),
+    queryKey: ["crawl-custom-extractions", crawlId],
+    queryFn: () => urlsApi.customExtractions(crawlId, 100),
     enabled: !!crawl && activeTab === "custom_extraction",
   });
 
@@ -271,6 +284,12 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     enabled: !!crawl && activeTab === "pagination",
   });
 
+  const { data: csData, isLoading: csLoading } = useQuery({
+    queryKey: ["crawl-custom-searches", crawlId],
+    queryFn: () => urlsApi.customSearches(crawlId, 100),
+    enabled: !!crawl && activeTab === "custom_search",
+  });
+
   const { data: issuesData, isLoading: issuesLoading } = useQuery({
     queryKey: ["crawl-issues", crawlId, issueCursor, activeSubFilter],
     queryFn: () => issuesApi.list(crawlId, { cursor: issueCursor, limit: 100, severity: currentFilter.severity as string | undefined }),
@@ -279,6 +298,19 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
 
   const isTerminal = !!effectiveStatus && !isActive(effectiveStatus) && effectiveStatus !== "idle" && effectiveStatus !== "configuring";
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: linksAnalysisData, isLoading: linksLoading } = useQuery<any>({
+    queryKey: ["crawl-links-analysis", crawlId],
+    queryFn: () => urlsApi.linksAnalysis(crawlId),
+    enabled: !!crawl && activeTab === "links_analysis" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: duplicatesData, isLoading: duplicatesLoading } = useQuery<any>({
+    queryKey: ["crawl-duplicates", crawlId],
+    queryFn: () => urlsApi.duplicates(crawlId),
+    enabled: !!crawl && activeTab === "duplicates" && isTerminal,
+  });
   const { data: issueSummary } = useQuery({
     queryKey: ["crawl-issues-summary", crawlId],
     queryFn: () => issuesApi.summary(crawlId),
@@ -303,6 +335,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
   const ceNextCursor = ceData?.next_cursor ?? null;
   const pagItems = pagData?.items ?? [];
   const pagNextCursor = pagData?.next_cursor ?? null;
+  const csItems = Array.isArray(csData) ? csData : [];
 
   const crawledCount = progress?.crawled_count ?? crawl?.crawled_urls_count ?? 0;
   const errorCount = progress?.error_count ?? crawl?.error_count ?? 0;
@@ -486,6 +519,12 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <CustomExtractionTable items={ceItems} loading={ceLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             ) : activeTab === "pagination" ? (
               <PaginationAuditTable items={pagItems} loading={pagLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
+            ) : activeTab === "custom_search" ? (
+              <CustomSearchTable items={csItems} loading={csLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
+            ) : activeTab === "links_analysis" ? (
+              <LinksAnalysisPanel data={linksAnalysisData} loading={linksLoading} isTerminal={isTerminal} />
+            ) : activeTab === "duplicates" ? (
+              <DuplicatesPanel data={duplicatesData} loading={duplicatesLoading} isTerminal={isTerminal} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -519,11 +558,11 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               </>
             ) : activeTab === "custom_extraction" ? (
               <>
-                <span>Showing {ceItems.length} pages with custom extractions</span>
-                <div className="flex gap-2">
-                  <button onClick={() => setCeCursor(null)} disabled={!ceCursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">First</button>
-                  <button onClick={() => setCeCursor(ceNextCursor)} disabled={!ceNextCursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
-                </div>
+                <span>Showing {ceItems.length} pages with custom extractions limit 100</span>
+              </>
+            ) : activeTab === "custom_search" ? (
+              <>
+                <span>Showing {csItems.length} pages with custom searches limit 100</span>
               </>
             ) : activeTab === "pagination" ? (
               <>
@@ -556,6 +595,18 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         {/* RIGHT SIDEBAR */}
         <div className="w-56 flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
           <div className="sf-panel-header">Overview</div>
+          {/* SERP Preview for selected URL */}
+          {selectedUrlDetail && (
+            <div className="px-2 py-2 border-b border-gray-200">
+              <SerpPreview
+                url={selectedUrlDetail.url}
+                title={selectedUrlDetail.title}
+                titlePixelWidth={selectedUrlDetail.title_pixel_width}
+                metaDescription={selectedUrlDetail.meta_description}
+                metaDescLength={selectedUrlDetail.meta_desc_length}
+              />
+            </div>
+          )}
           {overviewStats.map((section, si) => (
             <div key={si}>
               <div className="px-2.5 pt-2 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{section.title}</div>
@@ -608,12 +659,14 @@ function UrlTable({ urls, loading, activeTab, selectedUrlId, onRowClick, crawlAc
 interface ColDef { key: string; label: string; width?: string; align?: "left" | "right"; render: (url: CrawledUrl) => React.ReactNode; }
 
 function getColumnsForTab(tab: TabKey): ColDef[] {
-  const addressCol: ColDef = { key: "address", label: "Address", width: "35%", render: (url) => (
-    <div className="flex items-center gap-1">
-      <span className="truncate" title={url.url}>{truncateUrl(url.url)}</span>
-      <a href={url.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 text-gray-300 hover:text-gray-600" onClick={(e) => e.stopPropagation()}><ExternalLinkIcon className="h-2.5 w-2.5" /></a>
-    </div>
-  )};
+  const addressCol: ColDef = {
+    key: "address", label: "Address", width: "35%", render: (url) => (
+      <div className="flex items-center gap-1">
+        <span className="truncate" title={url.url}>{truncateUrl(url.url)}</span>
+        <a href={url.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 text-gray-300 hover:text-gray-600" onClick={(e) => e.stopPropagation()}><ExternalLinkIcon className="h-2.5 w-2.5" /></a>
+      </div>
+    )
+  };
   const statusCol: ColDef = { key: "status", label: "Status Code", width: "80px", align: "right", render: (url) => <span className={`font-mono font-semibold ${statusCodeColor(url.status_code)}`}>{url.status_code ?? "\u2014"}</span> };
   const contentTypeCol: ColDef = { key: "content_type", label: "Content Type", width: "130px", render: (url) => <span className="text-gray-500">{url.content_type?.split(";")[0] ?? "\u2014"}</span> };
   const titleCol: ColDef = { key: "title", label: "Title 1", width: "25%", render: (url) => <span className="text-gray-700" title={url.title ?? ""}>{url.title ?? "\u2014"}</span> };
@@ -924,6 +977,63 @@ function PaginationAuditTable({ items, loading, crawlActive }: {
   );
 }
 
+function CustomSearchTable({ items, loading, crawlActive }: {
+  items: CustomSearchItem[]; loading: boolean; crawlActive: boolean;
+}) {
+  if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Loading custom searches...</div>;
+  if (items.length === 0) return (
+    <div className="flex flex-col items-center justify-center h-32 text-xs text-gray-400 gap-1">
+      {crawlActive ? "Crawl in progress — custom searches will appear shortly..." : (
+        <>
+          <span>No custom search results found.</span>
+          <span className="text-[10px]">Configure search rules in your project settings, then start a new crawl.</span>
+        </>
+      )}
+    </div>
+  );
+
+  const allKeys = Array.from(new Set(items.flatMap((item) => Object.keys(item.search_results))));
+
+  return (
+    <table className="sf-table w-full">
+      <thead>
+        <tr>
+          <th style={{ width: "35%" }}>URL</th>
+          {allKeys.map((key) => (
+            <th key={key} className="text-right">{key}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((item) => (
+          <tr key={item.url_id}>
+            <td>
+              <div className="flex items-center gap-1">
+                <span className="truncate" title={item.url}>{truncateUrl(item.url, 55)}</span>
+                <a href={item.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 text-gray-300 hover:text-gray-600" onClick={(e) => e.stopPropagation()}>
+                  <ExternalLinkIcon className="h-2.5 w-2.5" />
+                </a>
+              </div>
+            </td>
+            {allKeys.map((key) => {
+              const val = item.search_results[key];
+              return (
+                <td key={key} className="text-right text-gray-600">
+                  {val !== null && val !== undefined ? (
+                    <span className="font-medium">{val > 0 ? <span className="text-[#6cc04a]">{val} hits</span> : <span className="text-gray-400">0</span>}</span>
+                  ) : (
+                    <span className="text-gray-300">—</span>
+                  )}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 type DetailTab = "url" | "seo" | "inlinks" | "outlinks" | "structured" | "headers";
 
 function BottomDetailPanel({ crawlId, urlId, detail, onClose }: { crawlId: string; urlId: string; detail: CrawledUrlDetail | null; onClose: () => void; }) {
@@ -977,7 +1087,7 @@ function BottomDetailPanel({ crawlId, urlId, detail, onClose }: { crawlId: strin
             {detail.redirect_url && <><span className="text-gray-400 font-medium">Redirect URL</span><span className="text-blue-600 truncate">{detail.redirect_url}</span></>}
             {detail.redirect_chain && detail.redirect_chain.length > 0 && (
               <><span className="text-gray-400 font-medium">Redirect Chain</span>
-              <div className="text-gray-600">{detail.redirect_chain.map((hop, i) => <div key={i} className="truncate">{i > 0 && <span className="text-gray-400 mr-1">&rarr;</span>}{typeof hop === "string" ? hop : JSON.stringify(hop)}</div>)}</div></>
+                <div className="text-gray-600">{detail.redirect_chain.map((hop, i) => <div key={i} className="truncate">{i > 0 && <span className="text-gray-400 mr-1">&rarr;</span>}{typeof hop === "string" ? hop : JSON.stringify(hop)}</div>)}</div></>
             )}
           </div>
         ) : detailTab === "seo" ? (
@@ -988,8 +1098,8 @@ function BottomDetailPanel({ crawlId, urlId, detail, onClose }: { crawlId: strin
             <span className="text-gray-400 font-medium">H2</span><span className="text-gray-700">{detail.h2?.join(" | ") ?? "\u2014"}</span>
             <span className="text-gray-400 font-medium">Robots Meta</span><span className="text-gray-700">{detail.robots_meta?.join(", ") ?? "\u2014"}</span>
             {seoData.og && typeof seoData.og === "object" && !Array.isArray(seoData.og) ? (<><span className="text-gray-400 font-medium">Open Graph</span><span className="text-gray-700">{Object.entries(seoData.og as Record<string, string>).map(([k, v]) => `${k}: ${v}`).join(" | ") || "\u2014"}</span></>) : null}
-            {seoData.hreflang && Array.isArray(seoData.hreflang) && (seoData.hreflang as {lang: string; href: string}[]).length > 0 ? (
-              <><span className="text-gray-400 font-medium">Hreflang</span><span className="text-gray-700">{(seoData.hreflang as {lang: string; href: string}[]).map((h) => `${h.lang}: ${h.href}`).join(" | ")}</span></>
+            {seoData.hreflang && Array.isArray(seoData.hreflang) && (seoData.hreflang as { lang: string; href: string }[]).length > 0 ? (
+              <><span className="text-gray-400 font-medium">Hreflang</span><span className="text-gray-700">{(seoData.hreflang as { lang: string; href: string }[]).map((h) => `${h.lang}: ${h.href}`).join(" | ")}</span></>
             ) : null}
             <span className="text-gray-400 font-medium">Crawled At</span><span className="text-gray-700">{new Date(detail.crawled_at).toLocaleString()}</span>
           </div>
@@ -1046,50 +1156,218 @@ function LinksTable({ links, direction }: { links: PageLink[]; direction: "inlin
 
 interface OverviewSection { title: string; items: { label: string; value: string | number; color?: string }[]; }
 
-function buildOverviewStats(crawl: Crawl, crawledCount: number, errorCount: number, issueSummary?: { total: number; by_severity: Record<string, number>; by_category: Record<string, number> } | null, urlsPerSec?: number | null, elapsed?: number | null): OverviewSection[] {
-  const sections: OverviewSection[] = [];
-
-  const crawlItems: { label: string; value: string | number; color?: string }[] = [
-    { label: "URLs Crawled", value: crawledCount.toLocaleString() },
-    { label: "URLs Found", value: (crawl.total_urls ?? 0).toLocaleString() },
-    { label: "Crawl Speed", value: urlsPerSec != null ? `${urlsPerSec < 0.1 ? urlsPerSec.toFixed(2) : urlsPerSec.toFixed(1)} URLs/sec` : "\u2014" },
-    { label: "Elapsed", value: elapsed != null ? formatDuration(elapsed) : "\u2014" },
-    { label: "Errors", value: errorCount.toLocaleString(), color: errorCount > 0 ? "text-red-600" : "" },
-    { label: "Mode", value: crawl.mode === "spider" ? "Spider" : "List" },
-    { label: "Status", value: crawl.status },
+function buildOverviewStats(
+  crawl: Crawl,
+  crawledCount: number,
+  errorCount: number,
+  issueSummary: { total: number; by_severity: Record<string, number>; by_category: Record<string, number> } | undefined,
+  urlsPerSec: number | null,
+  elapsed: number | null
+) {
+  const config = crawl.config as unknown as Record<string, unknown>;
+  const sections = [
+    {
+      title: "Crawl",
+      items: [
+        { label: "Status", value: crawl.status, color: "" },
+        { label: "Mode", value: crawl.mode === "spider" ? "Spider" : "List", color: "" },
+        { label: "URLs Found", value: (crawl.total_urls ?? 0).toLocaleString(), color: "" },
+        { label: "URLs Crawled", value: crawledCount.toLocaleString(), color: "" },
+        { label: "Errors", value: errorCount.toLocaleString(), color: errorCount > 0 ? "text-red-600" : "" },
+        ...(urlsPerSec != null ? [{ label: "Speed", value: `${urlsPerSec < 0.1 ? urlsPerSec.toFixed(2) : urlsPerSec.toFixed(1)} URLs/s`, color: "" }] : []),
+        ...(elapsed != null ? [{ label: "Duration", value: formatDuration(elapsed), color: "" }] : []),
+      ],
+    },
+    {
+      title: "Config",
+      items: [
+        { label: "Max URLs", value: String(config.max_urls ?? "\u221e"), color: "" },
+        { label: "Max Depth", value: String(config.max_depth ?? 10), color: "" },
+        { label: "User Agent", value: ((config.user_agent as string) ?? "—").slice(0, 20), color: "" },
+      ],
+    },
   ];
-
-  sections.push({ title: "Crawl", items: crawlItems });
 
   if (issueSummary && issueSummary.total > 0) {
     sections.push({
       title: "Issues",
       items: [
-        { label: "Total", value: issueSummary.total },
-        { label: "Critical", value: issueSummary.by_severity["critical"] ?? 0, color: "text-red-600" },
-        { label: "Warning", value: issueSummary.by_severity["warning"] ?? 0, color: "text-yellow-600" },
-        { label: "Info", value: issueSummary.by_severity["info"] ?? 0, color: "text-blue-600" },
-        { label: "Opportunity", value: issueSummary.by_severity["opportunity"] ?? 0, color: "text-green-600" },
+        { label: "Total", value: String(issueSummary.total), color: "" },
+        ...(issueSummary.by_severity.critical ? [{ label: "Critical", value: String(issueSummary.by_severity.critical), color: "text-red-600" }] : []),
+        ...(issueSummary.by_severity.warning ? [{ label: "Warning", value: String(issueSummary.by_severity.warning), color: "text-yellow-600" }] : []),
+        ...(issueSummary.by_severity.info ? [{ label: "Info", value: String(issueSummary.by_severity.info), color: "text-blue-600" }] : []),
+        ...(issueSummary.by_severity.opportunity ? [{ label: "Opportunity", value: String(issueSummary.by_severity.opportunity), color: "text-green-600" }] : []),
       ],
     });
-
-    const topCategories = Object.entries(issueSummary.by_category).sort(([, a], [, b]) => b - a).slice(0, 10);
-    if (topCategories.length > 0) {
-      sections.push({
-        title: "Top Issue Categories",
-        items: topCategories.map(([cat, count]) => ({ label: cat.replace(/_/g, " "), value: count })),
-      });
-    }
   }
 
   sections.push({
     title: "Timestamps",
     items: [
-      { label: "Created", value: new Date(crawl.created_at).toLocaleString() },
-      { label: "Started", value: crawl.started_at ? new Date(crawl.started_at).toLocaleString() : "\u2014" },
-      { label: "Completed", value: crawl.completed_at ? new Date(crawl.completed_at).toLocaleString() : "\u2014" },
+      { label: "Created", value: new Date(crawl.created_at).toLocaleString(), color: "" },
+      { label: "Started", value: crawl.started_at ? new Date(crawl.started_at).toLocaleString() : "—", color: "" },
+      { label: "Completed", value: crawl.completed_at ? new Date(crawl.completed_at).toLocaleString() : "—", color: "" },
     ],
   });
 
   return sections;
 }
+
+// ─── Links Analysis Panel (F2.10) ─────────────────────────────────────
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function LinksAnalysisPanel({ data, loading, isTerminal }: { data: any; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Links analysis available after crawl completes.</div>;
+  if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Analyzing internal links...</div>;
+  if (!data) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">No link data available.</div>;
+
+  const topPages = data.top_pages_by_inlinks ?? [];
+  const orphans = data.orphan_pages ?? [];
+  const depthDist = data.depth_distribution ?? [];
+  const anchorStats = data.anchor_text_stats ?? [];
+  const maxInlinks = topPages.length > 0 ? topPages[0].inlink_count : 1;
+
+  return (
+    <div className="p-4 space-y-6 overflow-auto">
+      {/* Depth Distribution */}
+      <div>
+        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Crawl Depth Distribution</h3>
+        <div className="space-y-1">
+          {depthDist.map((d: any) => (
+            <div key={d.crawl_depth} className="flex items-center gap-2 text-xs">
+              <span className="w-16 text-gray-500 text-right">Depth {d.crawl_depth}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
+                <div
+                  className="h-full bg-[#6cc04a] rounded-full transition-all"
+                  style={{ width: `${Math.max((d.url_count / Math.max(...depthDist.map((x: any) => x.url_count), 1)) * 100, 2)}%` }}
+                />
+              </div>
+              <span className="w-12 text-right text-gray-700 font-medium">{d.url_count}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Top Pages by Inlinks */}
+      <div>
+        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Top Pages by Inlinks</h3>
+        <table className="sf-table w-full">
+          <thead><tr><th style={{ width: "45%" }}>URL</th><th style={{ width: "25%" }}>Title</th><th className="text-right" style={{ width: "10%" }}>Inlinks</th><th className="text-right" style={{ width: "10%" }}>Depth</th></tr></thead>
+          <tbody>
+            {topPages.slice(0, 20).map((p: any) => (
+              <tr key={p.id}>
+                <td><span className="truncate block" title={p.url}>{truncateUrl(p.url, 55)}</span></td>
+                <td className="text-gray-500 truncate" title={p.title}>{p.title ?? "—"}</td>
+                <td className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <div className="w-12 bg-gray-100 rounded-full h-2 overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(p.inlink_count / maxInlinks) * 100}%` }} />
+                    </div>
+                    <span className="font-medium text-gray-700 w-6 text-right">{p.inlink_count}</span>
+                  </div>
+                </td>
+                <td className="text-right text-gray-500">{p.crawl_depth}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Orphan Pages */}
+      {orphans.length > 0 && (
+        <div>
+          <h3 className="text-xs font-bold text-orange-700 uppercase tracking-wide mb-2">⚠ Orphan Pages ({orphans.length})</h3>
+          <p className="text-[10px] text-gray-400 mb-1">Pages with zero internal inlinks — search engines may struggle to discover these.</p>
+          <table className="sf-table w-full">
+            <thead><tr><th style={{ width: "55%" }}>URL</th><th style={{ width: "25%" }}>Title</th><th className="text-right" style={{ width: "10%" }}>Status</th><th className="text-right" style={{ width: "10%" }}>Depth</th></tr></thead>
+            <tbody>
+              {orphans.slice(0, 20).map((p: any) => (
+                <tr key={p.id}>
+                  <td><span className="truncate block" title={p.url}>{truncateUrl(p.url, 60)}</span></td>
+                  <td className="text-gray-500 truncate">{p.title ?? "—"}</td>
+                  <td className={`text-right font-mono ${statusCodeColor(p.status_code)}`}>{p.status_code ?? "—"}</td>
+                  <td className="text-right text-gray-500">{p.crawl_depth}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Top Anchor Texts */}
+      {anchorStats.length > 0 && (
+        <div>
+          <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Top Anchor Texts</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {anchorStats.slice(0, 25).map((a: any, i: number) => (
+              <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded-full text-[11px] text-gray-700">
+                {a.anchor_text.length > 30 ? a.anchor_text.slice(0, 30) + "…" : a.anchor_text}
+                <span className="text-[9px] font-bold text-gray-400">{a.frequency}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Duplicates Panel (F2.12) ─────────────────────────────────────────
+
+function DuplicatesPanel({ data, loading, isTerminal }: { data: any; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Duplicate detection available after crawl completes.</div>;
+  if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Detecting duplicates...</div>;
+  if (!data) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">No duplicate data available.</div>;
+
+  const exact = data.exact_duplicates ?? [];
+  const near = data.near_duplicates ?? [];
+
+  if (exact.length === 0 && near.length === 0) {
+    return <div className="flex items-center justify-center h-32 text-xs text-gray-400">No duplicate content detected — great!</div>;
+  }
+
+  return (
+    <div className="p-4 space-y-6 overflow-auto">
+      {/* Exact Duplicates */}
+      {exact.length > 0 && (
+        <div>
+          <h3 className="text-xs font-bold text-red-700 uppercase tracking-wide mb-2">Exact Duplicates ({exact.length} groups)</h3>
+          <p className="text-[10px] text-gray-400 mb-2">Pages with identical content (same MD5 hash).</p>
+          {exact.map((group: any, gi: number) => (
+            <div key={gi} className="mb-3 p-2 bg-red-50 border border-red-200 rounded">
+              <p className="text-[10px] text-red-600 font-semibold mb-1">{group.count} identical pages</p>
+              {group.urls?.map((url: string, ui: number) => (
+                <div key={ui} className="text-[11px] text-gray-700 truncate" title={url}>
+                  <span className="text-gray-400 mr-1">{ui + 1}.</span>
+                  {truncateUrl(url, 70)}
+                  {group.titles?.[ui] && <span className="ml-2 text-gray-400">— {group.titles[ui]}</span>}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Near Duplicates */}
+      {near.length > 0 && (
+        <div>
+          <h3 className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-2">Near Duplicates ({near.length} groups)</h3>
+          <p className="text-[10px] text-gray-400 mb-2">Pages with very similar content (~95%+ similarity via SimHash).</p>
+          {near.map((group: any, gi: number) => (
+            <div key={gi} className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded">
+              <p className="text-[10px] text-amber-600 font-semibold mb-1">{group.count} similar pages</p>
+              {group.urls?.map((item: any, ui: number) => (
+                <div key={ui} className="text-[11px] text-gray-700 truncate" title={item.url}>
+                  <span className="text-gray-400 mr-1">{ui + 1}.</span>
+                  {truncateUrl(item.url, 70)}
+                  {item.title && <span className="ml-2 text-gray-400">— {item.title}</span>}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */

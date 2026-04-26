@@ -627,3 +627,193 @@ class UrlRepository:
         next_cursor = str(page_items[-1].id) if has_more and page_items else None
 
         return {"items": page_items, "next_cursor": next_cursor}
+
+    # ------------------------------------------------------------------
+    # Links Analysis (F2.10)
+    # ------------------------------------------------------------------
+
+    async def get_inlink_counts(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Get pages ranked by inlink count."""
+        sql = text("""
+            SELECT cu.id, cu.url, cu.title, cu.crawl_depth, cu.status_code,
+                   COUNT(pl.id) AS inlink_count
+            FROM crawled_urls cu
+            LEFT JOIN page_links pl
+              ON pl.crawl_id = cu.crawl_id
+              AND pl.target_url_hash = cu.url_hash
+              AND pl.link_type = 'internal'
+            WHERE cu.crawl_id = :crawl_id
+            GROUP BY cu.id, cu.url, cu.title, cu.crawl_depth, cu.status_code, cu.crawl_id
+            ORDER BY inlink_count DESC
+            LIMIT :limit OFFSET :offset
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit, "offset": offset}
+        )
+        return [
+            {
+                "id": str(r.id),
+                "url": r.url,
+                "title": r.title,
+                "crawl_depth": r.crawl_depth,
+                "status_code": r.status_code,
+                "inlink_count": r.inlink_count,
+            }
+            for r in result.all()
+        ]
+
+    async def get_orphan_pages(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Get pages with zero internal inlinks (excluding start URL)."""
+        sql = text("""
+            SELECT cu.id, cu.url, cu.title, cu.crawl_depth, cu.status_code
+            FROM crawled_urls cu
+            WHERE cu.crawl_id = :crawl_id
+              AND cu.crawl_depth > 0
+              AND NOT EXISTS (
+                SELECT 1 FROM page_links pl
+                WHERE pl.crawl_id = cu.crawl_id
+                  AND pl.target_url_hash = cu.url_hash
+                  AND pl.link_type = 'internal'
+              )
+            ORDER BY cu.url
+            LIMIT :limit OFFSET :offset
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit, "offset": offset}
+        )
+        return [
+            {
+                "id": str(r.id),
+                "url": r.url,
+                "title": r.title,
+                "crawl_depth": r.crawl_depth,
+                "status_code": r.status_code,
+            }
+            for r in result.all()
+        ]
+
+    async def get_depth_distribution(
+        self,
+        crawl_id: uuid.UUID,
+    ) -> list[dict[str, Any]]:
+        """Get URL count per crawl depth level."""
+        sql = text("""
+            SELECT crawl_depth, COUNT(*) AS url_count
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+            GROUP BY crawl_depth
+            ORDER BY crawl_depth
+        """)
+        result = await self._session.execute(sql, {"crawl_id": str(crawl_id)})
+        return [
+            {"crawl_depth": r.crawl_depth, "url_count": r.url_count}
+            for r in result.all()
+        ]
+
+    async def get_anchor_text_stats(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Get top anchor texts by frequency for internal links."""
+        sql = text("""
+            SELECT anchor_text, COUNT(*) AS frequency
+            FROM page_links
+            WHERE crawl_id = :crawl_id
+              AND link_type = 'internal'
+              AND anchor_text IS NOT NULL
+              AND anchor_text != ''
+            GROUP BY anchor_text
+            ORDER BY frequency DESC
+            LIMIT :limit
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        return [
+            {"anchor_text": r.anchor_text, "frequency": r.frequency}
+            for r in result.all()
+        ]
+
+    # ------------------------------------------------------------------
+    # Duplicate Content Detection (F2.12)
+    # ------------------------------------------------------------------
+
+    async def get_exact_duplicate_groups(
+        self,
+        crawl_id: uuid.UUID,
+    ) -> list[dict[str, Any]]:
+        """Group URLs by identical content_hash (exact duplicates)."""
+        sql = text("""
+            SELECT content_hash, array_agg(url) AS urls,
+                   array_agg(id::text) AS url_ids,
+                   array_agg(title) AS titles,
+                   COUNT(*) AS count
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND content_hash IS NOT NULL
+              AND status_code = 200
+            GROUP BY content_hash
+            HAVING COUNT(*) > 1
+            ORDER BY count DESC
+            LIMIT 50
+        """)
+        result = await self._session.execute(sql, {"crawl_id": str(crawl_id)})
+        return [
+            {
+                "urls": r.urls,
+                "url_ids": r.url_ids,
+                "titles": r.titles,
+                "count": r.count,
+            }
+            for r in result.all()
+        ]
+
+    async def get_near_duplicate_groups(
+        self,
+        crawl_id: uuid.UUID,
+    ) -> list[dict[str, Any]]:
+        """Find near-duplicate pages using SimHash from seo_data."""
+        from app.analysis.simhash import find_clusters
+
+        sql = text("""
+            SELECT id, url, title, (seo_data->>'simhash')::bigint AS simhash
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND seo_data->>'simhash' IS NOT NULL
+              AND status_code = 200
+        """)
+        result = await self._session.execute(sql, {"crawl_id": str(crawl_id)})
+        rows = result.all()
+
+        url_map = {str(r.id): {"url": r.url, "title": r.title} for r in rows}
+        hashes = [(str(r.id), r.simhash) for r in rows if r.simhash]
+
+        clusters = find_clusters(hashes, threshold=3)
+
+        groups = []
+        for cluster_ids in clusters:
+            group_urls = []
+            for uid in cluster_ids:
+                info = url_map.get(uid, {})
+                group_urls.append({
+                    "id": uid,
+                    "url": info.get("url", ""),
+                    "title": info.get("title", ""),
+                })
+            groups.append({
+                "urls": group_urls,
+                "count": len(group_urls),
+            })
+        groups.sort(key=lambda g: g["count"], reverse=True)
+        return groups[:50]

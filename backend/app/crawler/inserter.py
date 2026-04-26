@@ -46,11 +46,15 @@ class BatchInserter:
         self._link_buffer: list[tuple] = []
         self._redirect_buffer: list[tuple] = []
         self._issue_buffer: list[tuple] = []
+        self._extraction_buffer: list[tuple] = []
+        self._search_buffer: list[tuple] = []
         self._last_flush_time: float = time.monotonic()
         self._total_flushed_urls: int = 0
         self._total_flushed_links: int = 0
         self._total_flushed_redirects: int = 0
         self._total_flushed_issues: int = 0
+        self._total_flushed_extractions: int = 0
+        self._total_flushed_searches: int = 0
         self._total_errors: int = 0
 
     @property
@@ -61,6 +65,8 @@ class BatchInserter:
             + len(self._link_buffer)
             + len(self._redirect_buffer)
             + len(self._issue_buffer)
+            + len(self._extraction_buffer)
+            + len(self._search_buffer)
         )
 
     @property
@@ -118,9 +124,24 @@ class BatchInserter:
         if page_data.mixed_content_urls:
             seo_data["mixed_content_urls"] = page_data.mixed_content_urls
 
-        # Phase 3E: Custom extraction results
+        # Phase 3E: Custom extraction results (also stored as rows)
         if page_data.custom_extractions:
             seo_data["custom_extractions"] = page_data.custom_extractions
+            for ext_id, val in page_data.custom_extractions.items():
+                if ext_id and val is not None:
+                    try:
+                        self._extraction_buffer.append((crawl_id, url_id, uuid.UUID(ext_id), str(val)))
+                    except Exception:
+                        pass
+        
+        # Sprint 4: Custom search results
+        if page_data.custom_search_results:
+            for search_id, count in page_data.custom_search_results.items():
+                if search_id:
+                    try:
+                        self._search_buffer.append((crawl_id, url_id, uuid.UUID(search_id), int(count)))
+                    except Exception:
+                        pass
 
         # Pagination attributes (rel=next/prev)
         if page_data.pagination:
@@ -146,6 +167,10 @@ class BatchInserter:
         x_robots = headers.get("x-robots-tag")
         if x_robots:
             seo_data["x_robots_tag"] = x_robots
+
+        # Sprint 3: SimHash fingerprint for near-duplicate detection
+        if page_data.simhash:
+            seo_data["simhash"] = page_data.simhash
 
         redirect_chain = fetch_result.redirect_chain if fetch_result.redirect_chain else []
 
@@ -294,10 +319,27 @@ class BatchInserter:
                 self._total_flushed_issues += flushed
                 self._issue_buffer.clear()
 
+            # Flush Extractions
+            if self._extraction_buffer:
+                flushed, errors = await self._flush_extractions(conn, list(self._extraction_buffer))
+                # Add to total issues metric to avoid changing results dict schema too much
+                results["issues"] += flushed
+                results["errors"] += errors
+                self._total_flushed_extractions += flushed
+                self._extraction_buffer.clear()
+            
+            # Flush Searches
+            if self._search_buffer:
+                flushed, errors = await self._flush_searches(conn, list(self._search_buffer))
+                results["issues"] += flushed
+                results["errors"] += errors
+                self._total_flushed_searches += flushed
+                self._search_buffer.clear()
+
         self._total_errors += results["errors"]
         self._last_flush_time = time.monotonic()
 
-        if results["urls"] or results["links"] or results["redirects"] or results["issues"]:
+        if results["urls"] or results["links"] or results["redirects"] or results["issues"] or self._total_flushed_extractions or self._total_flushed_searches:
             logger.info(
                 "batch_flush_complete",
                 urls=results["urls"],
@@ -398,6 +440,26 @@ class BatchInserter:
             "details",
         ]
         return await self._copy_with_fallback(conn, "url_issues", columns, rows)
+
+    async def _flush_extractions(self, conn: asyncpg.Connection, rows: list[tuple]) -> tuple[int, int]:
+        """COPY custom_extractions rows."""
+        columns = [
+            "crawl_id",
+            "url_id",
+            "extractor_id",
+            "extracted_value",
+        ]
+        return await self._copy_with_fallback(conn, "custom_extractions", columns, rows)
+
+    async def _flush_searches(self, conn: asyncpg.Connection, rows: list[tuple]) -> tuple[int, int]:
+        """COPY custom_search_results rows."""
+        columns = [
+            "crawl_id",
+            "url_id",
+            "search_id",
+            "found_count",
+        ]
+        return await self._copy_with_fallback(conn, "custom_search_results", columns, rows)
 
     async def _copy_with_fallback(
         self,

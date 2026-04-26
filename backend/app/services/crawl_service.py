@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+import asyncpg
 import structlog
 from arq import ArqRedis
 from arq.connections import RedisSettings
@@ -16,6 +17,7 @@ from app.core.config import settings
 from app.models.crawl import Crawl
 from app.repositories.crawl_repo import CrawlRepository
 from app.repositories.url_repo import UrlRepository
+from app.repositories.custom_rules_repo import CustomRulesRepository
 from app.schemas.crawl import CrawlContinue, CrawlCreate
 
 logger = structlog.get_logger(__name__)
@@ -35,9 +37,11 @@ class CrawlService:
         self,
         session: AsyncSession,
         redis: Redis,
+        pool: asyncpg.Pool | None = None,
     ) -> None:
         self._repo = CrawlRepository(session)
         self._url_repo = UrlRepository(session)
+        self._pool = pool
         self._session = session
         self._redis = redis
 
@@ -55,6 +59,11 @@ class CrawlService:
             "rate_limit_rps": data.config.rate_limit_rps,
             "user_agent": data.config.user_agent,
             "respect_robots": data.config.respect_robots,
+            "include_patterns": data.config.include_patterns,
+            "exclude_patterns": data.config.exclude_patterns,
+            "url_rewrites": data.config.url_rewrites,
+            "strip_query_params": data.config.strip_query_params,
+            "render_js": data.config.render_js,
         }
 
         if data.mode == "list" and data.urls:
@@ -67,6 +76,17 @@ class CrawlService:
             mode=data.mode.value,
             config=config_dict,
         )
+        
+        # Sprint 4: Save custom extractors and searches
+        if self._pool and (data.custom_extractors or data.custom_searches):
+            custom_repo = CustomRulesRepository(self._pool)
+            if data.custom_extractors:
+                for ext in data.custom_extractors:
+                    await custom_repo.create_extractor(crawl.id, ext)
+            if data.custom_searches:
+                for search in data.custom_searches:
+                    await custom_repo.create_search(crawl.id, search)
+
         # Set status to queued
         await self._repo.update_status(crawl.id, "queued")
         await self._session.commit()

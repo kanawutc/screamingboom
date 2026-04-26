@@ -453,3 +453,32 @@ async def list_pagination_urls(
         "items": items,
         "next_cursor": result["next_cursor"],
     }
+
+
+@router.get("/crawls/{crawl_id}/links/analysis")
+async def get_links_analysis(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(50, ge=1, le=500),
+) -> dict:
+    """Internal links analysis: inlink counts, orphan pages, depth distribution, anchor text stats."""
+    repo = UrlRepository(db)
+    return {
+        "top_pages_by_inlinks": await repo.get_inlink_counts(crawl_id, limit=limit),
+        "orphan_pages": await repo.get_orphan_pages(crawl_id, limit=limit),
+        "depth_distribution": await repo.get_depth_distribution(crawl_id),
+        "anchor_text_stats": await repo.get_anchor_text_stats(crawl_id, limit=50),
+    }
+
+
+@router.get("/crawls/{crawl_id}/duplicates")
+async def get_duplicates(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+) -> dict:
+    """Get exact and near-duplicate URL groups."""
+    repo = UrlRepository(db)
+    return {
+        "exact_duplicates": await repo.get_exact_duplicate_groups(crawl_id),
+        "near_duplicates": await repo.get_near_duplicate_groups(crawl_id),
+    }

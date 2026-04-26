@@ -6,6 +6,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.schemas.custom_rules import CustomExtractorCreate, CustomSearchCreate
+
 
 class CrawlStatus(StrEnum):
     """Possible crawl statuses."""
@@ -39,6 +41,9 @@ class CrawlConfig(BaseModel):
     respect_robots: bool = True
     include_patterns: list[str] = Field(default_factory=list)
     exclude_patterns: list[str] = Field(default_factory=list)
+    url_rewrites: list[dict] = Field(default_factory=list)
+    strip_query_params: list[str] = Field(default_factory=list)
+    render_js: bool = False
 
 
 class CrawlCreate(BaseModel):
@@ -53,6 +58,8 @@ class CrawlCreate(BaseModel):
     mode: CrawlMode = CrawlMode.spider
     config: CrawlConfig = Field(default_factory=CrawlConfig)
     project_id: uuid.UUID | None = None
+    custom_extractors: list[CustomExtractorCreate] = Field(default_factory=list)
+    custom_searches: list[CustomSearchCreate] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_mode_fields(self) -> "CrawlCreate":

@@ -8,6 +8,7 @@ import type {
   ComparisonChangeType,
   CursorPage,
   CustomExtractionItem,
+  CustomSearchItem,
   ExternalLink,
   ExternalLinkFilterParams,
   ExtractionRule,
@@ -193,15 +194,28 @@ export const urlsApi = {
       `/crawls/${crawlId}/structured-data${qs({ cursor, limit })}`
     ),
 
-  customExtractions: (crawlId: string, cursor?: string | null, limit = 50) =>
-    request<{ items: CustomExtractionItem[]; next_cursor: string | null }>(
-      `/crawls/${crawlId}/custom-extractions${qs({ cursor, limit })}`
+  customExtractions: (crawlId: string, limit = 100) =>
+    request<CustomExtractionItem[]>(
+      `/crawls/${crawlId}/extractions${qs({ limit })}`
     ),
 
   pagination: (crawlId: string, filter?: string | null, cursor?: string | null, limit = 50) =>
     request<{ items: PaginationItem[]; next_cursor: string | null }>(
       `/crawls/${crawlId}/pagination${qs({ filter, cursor, limit })}`
     ),
+
+  customSearches: (crawlId: string, limit = 100) =>
+    request<CustomSearchItem[]>(
+      `/crawls/${crawlId}/search-results${qs({ limit })}`
+    ),
+
+  linksAnalysis: (crawlId: string, limit = 50) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/links/analysis${qs({ limit })}`),
+
+  duplicates: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/duplicates`),
 };
 
 export const extractionRulesApi = {

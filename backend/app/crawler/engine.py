@@ -5,12 +5,15 @@ and publishes real-time progress via Redis pub/sub.
 """
 
 import asyncio
+import fnmatch
 import json
 import time
 import uuid
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 import structlog
 
@@ -55,6 +58,11 @@ class CrawlConfig:
     urls: list[str] = field(default_factory=list)
     extraction_rules: list[dict] = field(default_factory=list)
     parent_crawl_id: str | None = None
+    include_patterns: list[str] = field(default_factory=list)
+    exclude_patterns: list[str] = field(default_factory=list)
+    url_rewrites: list[dict] = field(default_factory=list)
+    strip_query_params: list[str] = field(default_factory=list)
+    render_js: bool = False
 
 
 @dataclass
@@ -114,6 +122,23 @@ class CrawlEngine:
         # Effective domain (resolved after potential start URL redirect)
         self._base_domain: str = ""
 
+        # Pre-compile include/exclude patterns (glob → regex)
+        self._include_re = (
+            [re.compile(fnmatch.translate(p)) for p in config.include_patterns]
+            if config.include_patterns
+            else []
+        )
+        self._exclude_re = (
+            [re.compile(fnmatch.translate(p)) for p in config.exclude_patterns]
+            if config.exclude_patterns
+            else []
+        )
+        self._rewrite_re = (
+            [(re.compile(r["pattern"]), r["replacement"]) for r in config.url_rewrites]
+            if config.url_rewrites
+            else []
+        )
+
     @property
     def crawled_count(self) -> int:
         return self._stats.crawled_count
@@ -154,13 +179,31 @@ class CrawlEngine:
             redis=self._redis, crawl_id=crawl_id_str, max_urls=self._config.max_urls
         )
         self._parser = ParserPool()
+
+        # Sprint 4: Fetch custom rules
+        query_ext = "SELECT * FROM custom_extractors WHERE crawl_id = $1"
+        self._custom_extractors = [dict(r) for r in await self._pool.fetch(query_ext, self._crawl_id)]
+        query_srch = "SELECT * FROM custom_searches WHERE crawl_id = $1"
+        self._custom_searches = [dict(r) for r in await self._pool.fetch(query_srch, self._crawl_id)]
+
         self._inserter = BatchInserter(pool=self._pool)
         self._analyzer = CrawlAnalyzer(pool=self._pool, crawl_id=self._crawl_id)
-        self._fetcher = FetcherPool(
-            user_agent=self._config.user_agent,
-            max_per_host=self._config.max_per_host,
-            request_timeout=self._config.request_timeout,
-        )
+        render_js = getattr(self._config, "render_js", False)
+        if render_js:
+            from app.crawler.js_fetcher import JsFetcherPool
+            self._fetcher = JsFetcherPool(
+                user_agent=self._config.user_agent,
+                max_connections=self._config.max_connections,
+                max_per_host=self._config.max_per_host,
+                request_timeout=self._config.request_timeout,
+            )
+        else:
+            self._fetcher = FetcherPool(
+                user_agent=self._config.user_agent,
+                max_connections=self._config.max_connections,
+                max_per_host=self._config.max_per_host,
+                request_timeout=self._config.request_timeout,
+            )
 
         try:
             async with self._fetcher:
@@ -405,7 +448,8 @@ class CrawlEngine:
                         result.body,
                         base_url=result.final_url,
                         content_type_header=result.content_type,
-                        extraction_rules=self._config.extraction_rules or None,
+                        custom_extractors=self._custom_extractors,
+                        custom_searches=self._custom_searches,
                     )
                 except Exception as e:
                     logger.warning("parse_error", url=result.final_url, error=str(e))
@@ -458,7 +502,8 @@ class CrawlEngine:
                 # Add internal links to frontier for BFS
                 for link in page_data.links:
                     if link.link_type == "internal" and self._is_in_scope(link.url):
-                        await self._frontier.add(link.url, depth=depth + 1)
+                        rewritten = self._rewrite_url(link.url)
+                        await self._frontier.add(rewritten, depth=depth + 1)
                         self._stats.links_discovered += 1
 
             # Insert redirect chain
@@ -488,19 +533,47 @@ class CrawlEngine:
     # ------------------------------------------------------------------
 
     def _is_in_scope(self, url: str) -> bool:
-        """Check if a URL is within the crawl scope (same domain/subdomain)."""
+        """Check if a URL is within the crawl scope (domain + patterns)."""
         link_domain = extract_domain(url)
         if not link_domain:
             return False
 
-        if link_domain == self._base_domain:
-            return True
+        # Domain check
+        domain_ok = (link_domain == self._base_domain) or (
+            self._config.follow_subdomains
+            and link_domain.endswith(f".{self._base_domain}")
+        )
+        if not domain_ok:
+            return False
 
-        if self._config.follow_subdomains:
-            # Allow subdomains of the base domain
-            return link_domain.endswith(f".{self._base_domain}")
+        # Exclude patterns: if URL matches ANY exclude → reject
+        if self._exclude_re:
+            for pattern in self._exclude_re:
+                if pattern.search(url):
+                    return False
 
-        return False
+        # Include patterns: if set, URL must match AT LEAST ONE include
+        if self._include_re:
+            return any(pattern.search(url) for pattern in self._include_re)
+
+        return True
+
+    def _rewrite_url(self, url: str) -> str:
+        """Apply URL rewrite rules and strip query parameters."""
+        # Strip configured query params
+        if self._config.strip_query_params:
+            parsed = urlparse(url)
+            params = parse_qs(parsed.query, keep_blank_values=True)
+            for param in self._config.strip_query_params:
+                params.pop(param, None)
+            new_query = urlencode(params, doseq=True)
+            url = urlunparse(parsed._replace(query=new_query))
+
+        # Apply regex rewrites
+        for pattern, replacement in self._rewrite_re:
+            url = pattern.sub(replacement, url)
+
+        return url
 
     def _is_html_content(self, content_type: str) -> bool:
         """Check if Content-Type indicates HTML."""

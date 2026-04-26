@@ -48,10 +48,10 @@
 
 | Phase | Focus | Features | Priority |
 |-------|-------|----------|----------|
-| **Phase 1** | Core Crawl Engine | 12 features | 🔴 Critical |
-| **Phase 2** | SEO Analysis & Audit | 15 features | 🔴 Critical |
-| **Phase 3** | Advanced Analysis | 10 features | 🟡 Important |
-| **Phase 4** | Integrations & AI | 8 features | 🟡 Important |
+| **Phase 1** | Core Crawl Engine | 13 features | 🔴 Critical |
+| **Phase 2** | SEO Analysis & Audit | 17 features | 🔴 Critical |
+| **Phase 3** | Advanced Analysis | 17 features | 🟡 Important |
+| **Phase 4** | Integrations & AI | 9 features | 🟡 Important |
 | **Phase 5** | Reports & Automation | 7 features | 🟢 Nice-to-have |
 | **Phase 6** | Bonus Features (ของเพิ่ม) | 6 features | 🟢 Enhancement |
 
@@ -573,6 +573,19 @@ backend/
 
 ---
 
+### Feature 1.13: Resources / Network Rendering Tab
+**คำอธิบาย**: ตรวจสอบและแสดงรายการ network requests ทั้งหมด (JS, CSS, Images, XHR) ที่โหลดระหว่าง JavaScript Rendering
+**Reference**: https://www.screamingfrog.co.uk/seo-spider/user-guide/tabs/#resources
+
+**รายละเอียด**:
+- แสดงรายการ resources ที่ถูกโหลดเมื่อเปิด JS Mode (Playwright)
+- ดึงข้อมูล: URL, Content-Type, Size, Status Code, Response Time
+- ระบุสถานะ Blocked (เช่น โดน robots.txt block หรือ Adblocker)
+- กรองตาม resource type (Script, Stylesheet, Image, Font, XHR)
+- ส่งผลลัพธ์ไปแสดงใน Lower Window "Resources" tab
+
+---
+
 ## Phase 2: SEO Analysis & Audit 🔴
 
 > Core SEO analysis features — ข้อมูล SEO ที่ users ต้องการจริงๆ
@@ -727,6 +740,26 @@ backend/
 - Click issue → navigate ไปยัง affected URLs
 - Description + tips สำหรับทุก issue
 - Bulk Export: All Issues as separate spreadsheets
+
+---
+
+### Feature 2.16: Meta Keywords Analysis
+**คำอธิบาย**: วิเคราะห์ `<meta name="keywords">` สำหรับ search engines ที่ยังใช้งานหรือ legacy requirements
+**Reference**: https://www.screamingfrog.co.uk/seo-spider/user-guide/tabs/#meta-keyword
+
+**Filters**: Missing, Duplicate, Multiple, Keyword Count, Non-descriptive
+
+---
+
+### Feature 2.17: N-grams Analysis
+**คำอธิบาย**: วิเคราะห์ความถี่ของคำต่อหน้า (1-gram, 2-gram, 3-gram distributions)
+**Reference**: https://www.screamingfrog.co.uk/seo-spider/tutorials/how-to-use-n-grams/
+
+**รายละเอียด**:
+- แสดงผลใน Lower Window tab สำหรับแต่ละ URL
+- นับความถี่ของคำเดี่ยว (1-gram), คำคู่ (2-gram), และกลุ่มสามคำ (3-gram)
+- กรอง stop words (configurable)
+- ช่วยในการทำ TF-IDF analysis หรือหาเนื้อหาซ้ำซ้อน
 
 ---
 
@@ -965,6 +998,28 @@ backend/
 
 ---
 
+### Feature 3.16: AMP Validation
+**คำอธิบาย**: ตรวจสอบความถูกต้องของ AMP (Accelerated Mobile Pages) HTML specifications
+**Reference**: https://www.screamingfrog.co.uk/seo-spider/user-guide/tabs/#amp
+
+**รายละเอียด**:
+- ตรวจสอบหน้า AMP ที่เชื่อมโยงจาก `<link rel="amphtml">`
+- Validate AMP boilerplate, invalid tags, missing required elements
+- Filters: Missing Non-AMP Return Link, AMP URL Not Indexable, Invalid AMP HTML, Missing
+
+---
+
+### Feature 3.17: W3C HTML Validation
+**คำอธิบาย**: ตรวจสอบ HTML compliance ผ่าน W3C Validator API
+**Reference**: https://www.screamingfrog.co.uk/seo-spider/user-guide/tabs/#validation
+
+**รายละเอียด**:
+- ส่งหน้าไปทดสอบกับ W3C Validator API
+- ตรวจจับ HTML/CSS syntax errors และ warnings
+- Filters: HTML Errors, HTML Warnings, CSS Errors, CSS Warnings
+
+---
+
 ## Phase 4: Integrations & AI 🟡
 
 ### Feature 4.1: Custom Extraction (Web Scraping)
@@ -1065,6 +1120,19 @@ backend/
 
 **Ahrefs**: Domain Rating, URL Rating, Referring Domains, Backlinks, Organic Traffic
 **Moz**: Domain Authority, Page Authority, Spam Score, Linking Root Domains
+
+---
+
+### Feature 4.9: Custom JavaScript Execution
+**คำอธิบาย**: รัน JavaScript snippets แบบ custom โค้ดบนหน้าเว็บไซต์ระหว่าง rendering
+**Reference**: https://www.screamingfrog.co.uk/seo-spider/tutorials/how-to-debug-custom-javascript-snippets/
+**Reference**: https://www.screamingfrog.co.uk/seo-spider/user-guide/tabs/#custom-javascript-tab
+
+**รายละเอียด**:
+- พิมพ์โค้ด JavaScript ที่ต้องการรันใน Playwright
+- ใช้สำหรับกดปุ่ม (click), กรอกฟอร์ม, หรือดึงข้อมูลที่ซับซ้อนใน DOM
+- คืนค่าผลลัพธ์ลงใน Custom JavaScript tab (รองรับ JSON / Text / Arrays)
+- ทดสอบ snippet ก่อนเริ่ม crawl ได้ใน UI
 
 ---
 

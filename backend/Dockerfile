@@ -19,6 +19,13 @@ COPY pyproject.toml .
 # Install Python dependencies
 RUN uv pip install --system --no-cache -e .
 
+# Conditionally install Playwright and Chromium
+ARG INSTALL_PLAYWRIGHT=0
+RUN if [ "$INSTALL_PLAYWRIGHT" = "1" ]; then \
+      uv pip install --system --no-cache playwright && \
+      playwright install chromium --with-deps; \
+    fi
+
 # Copy application code
 COPY . .
 
