@@ -582,6 +582,74 @@ async def get_hreflang_data(
     return await repo.get_hreflang_data(crawl_id, limit=limit)
 
 
+@router.get("/crawls/{crawl_id}/site-structure")
+async def get_site_structure(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    max_nodes: int = Query(500, ge=1, le=5000),
+) -> dict:
+    """Build site structure tree from crawled URLs."""
+    repo = UrlRepository(db)
+    urls_data = await repo.get_site_structure(crawl_id, limit=max_nodes)
+
+    # Build tree from URL paths
+    tree: dict = {"name": "/", "path": "/", "children": {}, "pages": 0, "status_codes": {}, "depth": 0}
+
+    for u in urls_data:
+        url_str = u["url"]
+        try:
+            parsed = urlparse(url_str)
+            path = parsed.path.rstrip("/") or "/"
+            parts = [p for p in path.split("/") if p]
+        except Exception:
+            continue
+
+        node = tree
+        node["pages"] += 1
+        sc = str(u["status_code"] or "none")
+        node["status_codes"][sc] = node["status_codes"].get(sc, 0) + 1
+
+        for part in parts:
+            if part not in node["children"]:
+                current_path = "/" + "/".join(parts[:parts.index(part) + 1])
+                node["children"][part] = {
+                    "name": part,
+                    "path": current_path,
+                    "children": {},
+                    "pages": 0,
+                    "status_codes": {},
+                    "depth": parts.index(part) + 1,
+                }
+            node = node["children"][part]
+            node["pages"] += 1
+            node["status_codes"][sc] = node["status_codes"].get(sc, 0) + 1
+
+    # Convert children dicts to sorted lists
+    def _flatten(n: dict) -> dict:
+        children = sorted(n["children"].values(), key=lambda c: -c["pages"])
+        return {
+            "name": n["name"],
+            "path": n["path"],
+            "pages": n["pages"],
+            "status_codes": n["status_codes"],
+            "depth": n["depth"],
+            "children": [_flatten(c) for c in children],
+        }
+
+    # Compute directory stats
+    depth_counts: dict[int, int] = {}
+    for u in urls_data:
+        d = u.get("crawl_depth", 0)
+        depth_counts[d] = depth_counts.get(d, 0) + 1
+
+    return {
+        "tree": _flatten(tree),
+        "total_urls": len(urls_data),
+        "depth_distribution": [{"depth": d, "count": c} for d, c in sorted(depth_counts.items())],
+        "max_depth": max((u.get("crawl_depth", 0) for u in urls_data), default=0),
+    }
+
+
 async def _get_crawl_domain(db: DbSession, crawl_id: uuid.UUID) -> tuple[str, str]:
     """Get scheme and domain from crawl's start_url. Returns (scheme, domain)."""
     from app.models.crawl import Crawl

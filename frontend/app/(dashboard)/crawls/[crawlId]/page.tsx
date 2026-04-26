@@ -13,7 +13,7 @@ import {
   Pause, Play, Square, Trash2, ArrowLeft, ExternalLink as ExternalLinkIcon, Globe,
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
   X, Download, Search, Link2, Shield, Navigation, FileCode2, Sheet, Braces,
-  FastForward, Network, Copy, Cookie, Lock, Languages, Timer, Bot, Map, LayoutDashboard,
+  FastForward, Network, Copy, Cookie, Lock, Languages, Timer, Bot, Map, LayoutDashboard, FolderTree,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -33,7 +33,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "robots_txt" | "sitemaps" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -61,6 +61,7 @@ const TABS: TabDef[] = [
   { key: "hreflang", label: "Hreflang", icon: <Languages className="h-3 w-3" /> },
   { key: "links_analysis", label: "Links", icon: <Network className="h-3 w-3" /> },
   { key: "duplicates", label: "Duplicates", icon: <Copy className="h-3 w-3" /> },
+  { key: "site_structure", label: "Structure", icon: <FolderTree className="h-3 w-3" /> },
   { key: "robots_txt", label: "Robots.txt", icon: <Bot className="h-3 w-3" /> },
   { key: "sitemaps", label: "Sitemaps", icon: <Map className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
@@ -186,6 +187,9 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   duplicates: [
     { label: "All", filter: {} },
   ],
+  site_structure: [
+    { label: "All", filter: {} },
+  ],
   robots_txt: [
     { label: "All", filter: {} },
   ],
@@ -285,7 +289,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "robots_txt" && activeTab !== "sitemaps",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -409,6 +413,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-sitemap-analysis", crawlId],
     queryFn: () => urlsApi.sitemapAnalysis(crawlId),
     enabled: !!crawl && activeTab === "sitemaps",
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: structureData, isLoading: structureLoading } = useQuery<any>({
+    queryKey: ["crawl-site-structure", crawlId],
+    queryFn: () => urlsApi.siteStructure(crawlId),
+    enabled: !!crawl && activeTab === "site_structure",
   });
 
   const { data: issueSummary } = useQuery({
@@ -646,6 +657,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <LinksAnalysisPanel data={linksAnalysisData} loading={linksLoading} isTerminal={isTerminal} linkScores={linkScoresData} />
             ) : activeTab === "duplicates" ? (
               <DuplicatesPanel data={duplicatesData} loading={duplicatesLoading} isTerminal={isTerminal} />
+            ) : activeTab === "site_structure" ? (
+              <SiteStructurePanel data={structureData} loading={structureLoading} />
             ) : activeTab === "robots_txt" ? (
               <RobotsTxtPanel data={robotsTxtData} loading={robotsLoading} />
             ) : activeTab === "sitemaps" ? (
@@ -657,7 +670,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
 
           {/* PAGINATION */}
           <div className="flex items-center justify-between px-3 py-1 bg-white border-t border-gray-200 text-[11px] text-gray-500 flex-shrink-0">
-            {activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" ? (
+            {activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" ? (
               <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
             ) : activeTab === "issues" ? (
               <>
@@ -2112,6 +2125,119 @@ function OverviewPanel({ crawl, crawledCount, errorCount, issueSummary, healthSc
           <div><span className="text-gray-500">Started:</span> <span className="font-medium">{crawl.started_at ? new Date(crawl.started_at).toLocaleString() : "—"}</span></div>
           <div><span className="text-gray-500">Completed:</span> <span className="font-medium">{crawl.completed_at ? new Date(crawl.completed_at).toLocaleString() : "—"}</span></div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Site Structure Panel ─────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function SiteStructurePanel({ data, loading }: { data: any | undefined; loading: boolean }) {
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set(["/"]));
+
+  if (loading) return <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Building site structure...</div>;
+  if (!data) return <div className="p-4 text-gray-400 text-sm">No data available</div>;
+
+  const tree = data.tree;
+  const depthDist = data.depth_distribution ?? [];
+
+  function togglePath(path: string) {
+    setExpandedPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function renderNode(node: any, indent: number): React.ReactNode[] {
+    const isExpanded = expandedPaths.has(node.path);
+    const hasChildren = node.children && node.children.length > 0;
+    const statusCounts = node.status_codes || {};
+    const errorCount = Object.entries(statusCounts)
+      .filter(([k]) => k.startsWith("4") || k.startsWith("5"))
+      .reduce((s, [, v]) => s + (v as number), 0);
+
+    const rows: React.ReactNode[] = [];
+    rows.push(
+      <tr key={node.path} className="border-b border-gray-50 hover:bg-blue-50/40 cursor-pointer" onClick={() => hasChildren && togglePath(node.path)}>
+        <td className="py-1 px-2" style={{ paddingLeft: `${indent * 16 + 8}px` }}>
+          <span className="inline-flex items-center gap-1">
+            {hasChildren ? (
+              <span className="text-gray-400 w-3 text-center text-[10px]">{isExpanded ? "▼" : "▶"}</span>
+            ) : (
+              <span className="w-3 text-center text-gray-300 text-[10px]">·</span>
+            )}
+            <span className={`font-mono text-[11px] ${hasChildren ? "font-medium text-gray-800" : "text-gray-600"}`}>
+              {node.name === "/" ? "/" : `/${node.name}/`}
+            </span>
+          </span>
+        </td>
+        <td className="py-1 px-2 text-right text-[11px] font-mono text-gray-700">{node.pages}</td>
+        <td className="py-1 px-2 text-right text-[11px] font-mono text-gray-500">{node.depth}</td>
+        <td className="py-1 px-2 text-right text-[11px]">
+          {errorCount > 0 && <span className="text-red-600 font-mono">{errorCount} err</span>}
+        </td>
+      </tr>
+    );
+
+    if (isExpanded && hasChildren) {
+      for (const child of node.children) {
+        rows.push(...renderNode(child, indent + 1));
+      }
+    }
+
+    return rows;
+  }
+
+  return (
+    <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(100vh-280px)]">
+      {/* Summary */}
+      <div className="grid grid-cols-4 gap-3">
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">Total URLs</div>
+          <div className="text-lg font-bold text-gray-900">{data.total_urls}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">Max Depth</div>
+          <div className="text-lg font-bold text-gray-900">{data.max_depth}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">Directories</div>
+          <div className="text-lg font-bold text-gray-900">{tree?.children?.length ?? 0}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="text-[11px] text-gray-500 mb-1">Depth Distribution</div>
+          <div className="flex gap-1 items-end h-8">
+            {depthDist.map((d: any) => {
+              const maxCount = Math.max(...depthDist.map((dd: any) => dd.count));
+              return (
+                <div key={d.depth} className="flex flex-col items-center" title={`Depth ${d.depth}: ${d.count} URLs`}>
+                  <div className="bg-green-400 rounded-t w-4" style={{ height: `${Math.max((d.count / maxCount) * 28, 2)}px` }} />
+                  <span className="text-[8px] text-gray-400">{d.depth}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Tree view */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-gray-50 sticky top-0">
+            <tr className="text-left text-[10px] text-gray-500 uppercase tracking-wider">
+              <th className="px-2 py-1.5 font-medium">Path</th>
+              <th className="px-2 py-1.5 font-medium text-right w-20">Pages</th>
+              <th className="px-2 py-1.5 font-medium text-right w-16">Depth</th>
+              <th className="px-2 py-1.5 font-medium text-right w-20">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tree && renderNode(tree, 0)}
+          </tbody>
+        </table>
       </div>
     </div>
   );

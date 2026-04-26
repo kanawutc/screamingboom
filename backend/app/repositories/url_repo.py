@@ -1165,6 +1165,33 @@ class UrlRepository:
             "slowest_pages": slowest,
         }
 
+    async def get_site_structure(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 500,
+    ) -> list[dict]:
+        """Get URL paths for site structure tree."""
+        sql = text("""
+            SELECT id, url, status_code, crawl_depth, content_type
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+            ORDER BY url
+            LIMIT :limit
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        return [
+            {
+                "id": str(r.id),
+                "url": r.url,
+                "status_code": r.status_code,
+                "crawl_depth": r.crawl_depth,
+                "content_type": r.content_type,
+            }
+            for r in result.all()
+        ]
+
     async def get_hreflang_data(
         self,
         crawl_id: uuid.UUID,

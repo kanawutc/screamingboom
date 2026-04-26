@@ -256,6 +256,10 @@ export const urlsApi = {
   sitemapAnalysis: (crawlId: string) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/sitemap-analysis`),
+
+  siteStructure: (crawlId: string, maxNodes = 500) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/site-structure${qs({ max_nodes: maxNodes })}`),
 };
 
 export const extractionRulesApi = {
