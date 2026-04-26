@@ -607,6 +607,97 @@ async def get_crawl_speed(
     return await repo.get_crawl_speed_chart(crawl_id)
 
 
+@router.get("/crawls/{crawl_id}/summary-report")
+async def get_summary_report(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+) -> dict:
+    """Generate a comprehensive text summary report of crawl findings."""
+    repo = UrlRepository(db)
+
+    health = await repo.get_health_score(crawl_id)
+    overview = await repo.get_overview_stats(crawl_id)
+    quick_wins = await repo.get_quick_wins(crawl_id)
+    perf = await repo.get_performance_stats(crawl_id)
+
+    # Issue summary
+    from app.repositories.issue_repo import IssueRepository
+    issue_repo = IssueRepository(db)
+    issue_summary = await issue_repo.summary(crawl_id)
+
+    # Build report sections
+    sections = []
+
+    # Health
+    sections.append({
+        "title": "SEO Health Score",
+        "content": f"{health['score']}/100 (Grade {health['grade']})",
+        "details": [
+            f"Status Codes: {health['components']['status_codes']}/100",
+            f"Indexability: {health['components']['indexability']}/100",
+            f"Issues: {health['components']['issues']}/100",
+            f"Performance: {health['components']['performance']}/100",
+        ],
+    })
+
+    # Overview
+    metrics = health.get("metrics", {})
+    sections.append({
+        "title": "Crawl Overview",
+        "content": f"{metrics.get('total_urls', 0)} URLs crawled",
+        "details": [
+            f"OK (2xx): {metrics.get('ok_urls', 0)}",
+            f"Redirects (3xx): {metrics.get('redirect_urls', 0)}",
+            f"Errors (4xx/5xx): {metrics.get('error_urls', 0)}",
+            f"Indexable: {metrics.get('indexable_urls', 0)}",
+            f"Avg Response: {metrics.get('avg_response_ms', 0)}ms",
+        ],
+    })
+
+    # Issues
+    if issue_summary:
+        by_sev = issue_summary.get("by_severity", {})
+        sections.append({
+            "title": "Issues Found",
+            "content": f"{issue_summary.get('total', 0)} total issues",
+            "details": [
+                f"Critical: {by_sev.get('critical', 0)}",
+                f"Warning: {by_sev.get('warning', 0)}",
+                f"Info: {by_sev.get('info', 0)}",
+                f"Opportunity: {by_sev.get('opportunity', 0)}",
+            ],
+        })
+
+    # Quick Wins
+    if quick_wins:
+        sections.append({
+            "title": "Recommended Actions",
+            "content": f"{len(quick_wins)} action items",
+            "details": [f"[{w['priority'].upper()}] {w['action']}" for w in quick_wins[:10]],
+        })
+
+    # Performance
+    stats = perf.get("stats", {})
+    if stats.get("total"):
+        sections.append({
+            "title": "Performance",
+            "content": f"Avg {stats.get('avg_ms', 0)}ms, P95 {stats.get('p95_ms', 0)}ms",
+            "details": [
+                f"Slowest: {stats.get('max_ms', 0)}ms",
+                f"Pages >1s: {stats.get('slow_count', 0)}",
+                f"Pages >3s: {stats.get('very_slow_count', 0)}",
+            ],
+        })
+
+    return {
+        "crawl_id": str(crawl_id),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "health_score": health["score"],
+        "health_grade": health["grade"],
+        "sections": sections,
+    }
+
+
 @router.get("/crawls/{crawl_id}/keywords")
 async def get_top_keywords(
     crawl_id: uuid.UUID,
