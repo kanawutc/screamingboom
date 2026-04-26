@@ -90,6 +90,10 @@ export const projectsApi = {
 
   delete: (id: string) =>
     request<void>(`/projects/${id}`, { method: "DELETE" }),
+
+  stats: (id: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/projects/${id}/stats`),
 };
 
 export const crawlsApi = {

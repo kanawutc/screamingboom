@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy import text
 
 from app.api.deps import DbSession
 from app.schemas.pagination import CursorPage
@@ -59,6 +60,50 @@ async def update_project(
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
     return ProjectResponse.model_validate(project)
+
+
+@router.get("/{project_id}/stats")
+async def get_project_stats(project_id: uuid.UUID, db: DbSession) -> dict:
+    """Get project crawl history with summary stats."""
+    sql = text("""
+        SELECT
+            c.id AS crawl_id,
+            c.status,
+            c.started_at,
+            c.completed_at,
+            c.crawled_urls_count,
+            c.error_count,
+            c.total_urls,
+            EXTRACT(EPOCH FROM (c.completed_at - c.started_at))::int AS duration_secs
+        FROM crawls c
+        WHERE c.project_id = :project_id
+        ORDER BY c.created_at DESC
+        LIMIT 20
+    """)
+    result = await db.execute(sql, {"project_id": str(project_id)})
+    crawls = [
+        {
+            "crawl_id": str(r.crawl_id),
+            "status": r.status,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+            "urls_crawled": r.crawled_urls_count,
+            "errors": r.error_count,
+            "total_urls": r.total_urls,
+            "duration_secs": r.duration_secs,
+        }
+        for r in result.all()
+    ]
+
+    total_crawls = len(crawls)
+    completed = [c for c in crawls if c["status"] == "completed"]
+
+    return {
+        "total_crawls": total_crawls,
+        "completed_crawls": len(completed),
+        "latest_crawl": crawls[0] if crawls else None,
+        "crawl_history": crawls,
+    }
 
 
 @router.delete("/{project_id}", status_code=204)
