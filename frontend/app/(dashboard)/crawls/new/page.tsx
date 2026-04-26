@@ -14,10 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { projectsApi, crawlsApi } from "@/lib/api-client";
-import type { CrawlMode, CrawlConfig, Project, CustomExtractorCreate, CustomSearchCreate } from "@/types";
+import { projectsApi, crawlsApi, configProfilesApi } from "@/lib/api-client";
+import type { CrawlMode, CrawlConfig, Project, CustomExtractorCreate, CustomSearchCreate, ConfigProfile } from "@/types";
 import { DEFAULT_CRAWL_CONFIG } from "@/types";
-import { Plus, Trash2, Braces, Search } from "lucide-react";
+import { Plus, Trash2, Braces, Search, FileSliders } from "lucide-react";
 
 const UA_PRESETS: Record<string, string> = {
   default: "SEOSpider/1.0",
@@ -73,6 +73,30 @@ export default function NewCrawlPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [localExtractors, setLocalExtractors] = useState<CustomExtractorCreate[]>([]);
   const [localSearches, setLocalSearches] = useState<CustomSearchCreate[]>([]);
+
+  // Fetch config profiles
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["config-profiles"],
+    queryFn: () => configProfilesApi.list(),
+  });
+
+  const applyProfile = (profile: ConfigProfile) => {
+    const c = profile.config;
+    setConfig((prev) => ({
+      ...prev,
+      max_urls: c.max_urls ?? prev.max_urls,
+      max_depth: c.max_depth ?? prev.max_depth,
+      max_threads: c.max_threads ?? prev.max_threads,
+      rate_limit_rps: c.rate_limit_rps ?? prev.rate_limit_rps,
+      user_agent: c.user_agent ?? prev.user_agent,
+      respect_robots: c.respect_robots ?? prev.respect_robots,
+    }));
+    // Match UA preset if possible
+    const ua = c.user_agent ?? "SEOSpider/1.0";
+    const matchingPreset = Object.entries(UA_PRESETS).find(([, v]) => v === ua);
+    if (matchingPreset) setUaPreset(matchingPreset[0]);
+    else setUaPreset("default");
+  };
 
   // Fetch or create default project
   const { data: projectsData } = useQuery({
@@ -293,7 +317,32 @@ export default function NewCrawlPage() {
       {/* Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle>Crawl Configuration</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Crawl Configuration</CardTitle>
+            {profiles.length > 0 && (
+              <Select
+                onValueChange={(profileId) => {
+                  const p = profiles.find((pr: ConfigProfile) => pr.id === profileId);
+                  if (p) applyProfile(p);
+                }}
+              >
+                <SelectTrigger className="w-48">
+                  <FileSliders className="mr-1.5 h-3.5 w-3.5 text-gray-400" />
+                  <SelectValue placeholder="Load Profile..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {profiles.map((p: ConfigProfile) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                      {p.is_default && (
+                        <span className="ml-1 text-xs text-gray-400">(default)</span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

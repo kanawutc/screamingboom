@@ -361,6 +361,42 @@ export interface CrawlComparisonResponse {
 
 export type ComparisonChangeType = "added" | "removed" | "changed" | "unchanged";
 
+// ─── Config Profiles ────────────────────────────────────────────────
+export interface ConfigProfileConfig {
+  max_urls?: number;
+  max_depth?: number;
+  max_threads?: number;
+  rate_limit_rps?: number;
+  user_agent?: string;
+  respect_robots?: boolean;
+  include_patterns?: string[];
+  exclude_patterns?: string[];
+}
+
+export interface ConfigProfile {
+  id: string;
+  name: string;
+  description: string;
+  config: ConfigProfileConfig;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConfigProfileCreate {
+  name: string;
+  description?: string;
+  config?: ConfigProfileConfig;
+  is_default?: boolean;
+}
+
+export interface ConfigProfileUpdate {
+  name?: string;
+  description?: string;
+  config?: ConfigProfileConfig;
+  is_default?: boolean;
+}
+
 // ─── Schedules ──────────────────────────────────────────────────────
 export interface ScheduleCrawlConfig {
   start_url?: string | null;

@@ -27,6 +27,9 @@ import type {
   CrawlSchedule,
   ScheduleCreate,
   ScheduleUpdate,
+  ConfigProfile,
+  ConfigProfileCreate,
+  ConfigProfileUpdate,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -392,6 +395,30 @@ export const schedulesApi = {
 
   delete: (projectId: string, scheduleId: string) =>
     request<void>(`/projects/${projectId}/schedules/${scheduleId}`, {
+      method: "DELETE",
+    }),
+};
+
+export const configProfilesApi = {
+  list: () => request<ConfigProfile[]>("/config-profiles"),
+
+  create: (data: ConfigProfileCreate) =>
+    request<ConfigProfile>("/config-profiles", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  get: (profileId: string) =>
+    request<ConfigProfile>(`/config-profiles/${profileId}`),
+
+  update: (profileId: string, data: ConfigProfileUpdate) =>
+    request<ConfigProfile>(`/config-profiles/${profileId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (profileId: string) =>
+    request<void>(`/config-profiles/${profileId}`, {
       method: "DELETE",
     }),
 };
