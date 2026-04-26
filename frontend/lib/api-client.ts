@@ -324,6 +324,14 @@ export const urlsApi = {
   ogAudit: (crawlId: string, limit = 200) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/crawls/${crawlId}/og-audit${qs({ limit })}`),
+
+  resourcesAudit: (crawlId: string, limit = 300) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/resources${qs({ limit })}`),
+
+  mobileAudit: (crawlId: string, limit = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/mobile-audit${qs({ limit })}`),
 };
 
 export const extractionRulesApi = {

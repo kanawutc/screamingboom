@@ -14,7 +14,7 @@ import {
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
   X, Download, Search, Link2, Shield, Navigation, FileCode2, Sheet, Braces,
   FastForward, Network, Copy, Cookie, Lock, Languages, Timer, Bot, Map, LayoutDashboard, FolderTree,
-  ClipboardList, Unlink, BarChart3, Layers, Gauge, BookOpen, Share2,
+  ClipboardList, Unlink, BarChart3, Layers, Gauge, BookOpen, Share2, Package, Smartphone,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -34,7 +34,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "link_graph" | "orphan_pages" | "content_quality" | "depth_analysis" | "response_times" | "readability" | "og_audit" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "keywords" | "report" | "link_graph" | "orphan_pages" | "content_quality" | "depth_analysis" | "response_times" | "readability" | "og_audit" | "resources" | "mobile" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -76,6 +76,8 @@ const TABS: TabDef[] = [
   { key: "response_times", label: "Response Times", icon: <Gauge className="h-3 w-3" /> },
   { key: "readability", label: "Readability", icon: <BookOpen className="h-3 w-3" /> },
   { key: "og_audit", label: "Open Graph", icon: <Share2 className="h-3 w-3" /> },
+  { key: "resources", label: "Resources", icon: <Package className="h-3 w-3" /> },
+  { key: "mobile", label: "Mobile", icon: <Smartphone className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -242,6 +244,12 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   og_audit: [
     { label: "All", filter: {} },
   ],
+  resources: [
+    { label: "All", filter: {} },
+  ],
+  mobile: [
+    { label: "All", filter: {} },
+  ],
   issues: [
     { label: "All", filter: {} },
     { label: "Critical", filter: { severity: "critical" } },
@@ -335,7 +343,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords" && activeTab !== "report" && activeTab !== "link_graph" && activeTab !== "orphan_pages" && activeTab !== "content_quality" && activeTab !== "depth_analysis" && activeTab !== "response_times" && activeTab !== "readability" && activeTab !== "og_audit",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments" && activeTab !== "keywords" && activeTab !== "report" && activeTab !== "link_graph" && activeTab !== "orphan_pages" && activeTab !== "content_quality" && activeTab !== "depth_analysis" && activeTab !== "response_times" && activeTab !== "readability" && activeTab !== "og_audit" && activeTab !== "resources" && activeTab !== "mobile",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -573,6 +581,20 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-og-audit", crawlId],
     queryFn: () => urlsApi.ogAudit(crawlId),
     enabled: !!crawl && activeTab === "og_audit" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: resourcesData, isLoading: resourcesLoading } = useQuery<any>({
+    queryKey: ["crawl-resources", crawlId],
+    queryFn: () => urlsApi.resourcesAudit(crawlId),
+    enabled: !!crawl && activeTab === "resources" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: mobileData, isLoading: mobileLoading } = useQuery<any>({
+    queryKey: ["crawl-mobile", crawlId],
+    queryFn: () => urlsApi.mobileAudit(crawlId),
+    enabled: !!crawl && activeTab === "mobile" && isTerminal,
   });
 
   const { data: issueSummary } = useQuery({
@@ -840,6 +862,10 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <ReadabilityPanel data={readabilityData} loading={readabilityLoading} isTerminal={isTerminal} />
             ) : activeTab === "og_audit" ? (
               <OgAuditPanel data={ogData2} loading={ogLoading} isTerminal={isTerminal} />
+            ) : activeTab === "resources" ? (
+              <ResourcesPanel data={resourcesData} loading={resourcesLoading} isTerminal={isTerminal} />
+            ) : activeTab === "mobile" ? (
+              <MobilePanel data={mobileData} loading={mobileLoading} isTerminal={isTerminal} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -855,7 +881,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
                   <button onClick={() => setLogCursor(timelineData?.next_cursor)} disabled={!timelineData?.next_cursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
                 </div>
               </>
-            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" || activeTab === "link_graph" || activeTab === "orphan_pages" || activeTab === "content_quality" || activeTab === "depth_analysis" || activeTab === "response_times" || activeTab === "readability" || activeTab === "og_audit" ? (
+            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" || activeTab === "keywords" || activeTab === "report" || activeTab === "link_graph" || activeTab === "orphan_pages" || activeTab === "content_quality" || activeTab === "depth_analysis" || activeTab === "response_times" || activeTab === "readability" || activeTab === "og_audit" || activeTab === "resources" || activeTab === "mobile" ? (
               <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
             ) : activeTab === "issues" ? (
               <>
@@ -3050,6 +3076,174 @@ function KeywordsPanel({ data, loading, isTerminal }: { data: any | undefined; l
                       style={{ width: `${Math.max(kw.weight * 100, 2)}%` }}
                     />
                   </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Resources Panel ─────────────────────────────────────────────────────
+function ResourcesPanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Resources available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Auditing resources...</div>;
+  if (!data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No resource data</div>;
+
+  const { types = [], resources = [] } = data;
+  const totalResources = types.reduce((sum: number, t: any) => sum + t.count, 0);
+  const maxCount = Math.max(...types.map((t: any) => t.count), 1);
+  const typeColors: Record<string, string> = {
+    HTML: "bg-blue-500", JavaScript: "bg-yellow-500", CSS: "bg-purple-500",
+    Image: "bg-green-500", Font: "bg-pink-500", PDF: "bg-red-500",
+    JSON: "bg-cyan-500", XML: "bg-orange-500", Other: "bg-gray-400",
+  };
+
+  return (
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      <div className="text-xs text-gray-600">
+        <strong>{totalResources}</strong> total resources across <strong>{types.length}</strong> types
+      </div>
+
+      {/* Type distribution */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <h3 className="text-xs font-semibold text-gray-700 mb-3">Resource Type Breakdown</h3>
+        <div className="space-y-2">
+          {types.map((t: any, i: number) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-[10px] text-gray-500 w-20 text-right flex-shrink-0">{t.type}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-4 relative">
+                <div
+                  className={`h-4 rounded-full ${typeColors[t.type] || "bg-gray-400"} transition-all`}
+                  style={{ width: `${Math.max((t.count / maxCount) * 100, 3)}%` }}
+                />
+                <span className="absolute inset-y-0 flex items-center pl-2 text-[10px] font-medium text-white mix-blend-difference">
+                  {t.count} · {t.ok_count} OK · {t.error_count} errors · avg {t.avg_response_ms}ms
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Resources table */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-gray-50 z-10">
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="text-left py-1.5 px-2">URL</th>
+              <th className="text-left py-1.5 px-2 w-32">Content Type</th>
+              <th className="text-center py-1.5 px-2 w-16">Status</th>
+              <th className="text-right py-1.5 px-2 w-20">Time</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {resources.map((r: any, i: number) => (
+              <tr key={i} className={`hover:bg-gray-50/50 ${r.status_code >= 400 ? "bg-red-50/30" : ""}`}>
+                <td className="py-1.5 px-2 text-blue-600 truncate max-w-md" title={r.url}>
+                  {truncateUrl(r.url, 60)}
+                </td>
+                <td className="py-1.5 px-2 text-gray-600 text-[10px]">{r.content_type}</td>
+                <td className="py-1.5 px-2 text-center">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                    r.status_code >= 200 && r.status_code < 300 ? "bg-green-50 text-green-700" :
+                    r.status_code >= 300 && r.status_code < 400 ? "bg-amber-50 text-amber-700" :
+                    "bg-red-50 text-red-700"
+                  }`}>{r.status_code}</span>
+                </td>
+                <td className="py-1.5 px-2 text-right font-mono text-gray-600">{r.response_time_ms}ms</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Mobile Panel ────────────────────────────────────────────────────────
+function MobilePanel({ data, loading, isTerminal }: { data: any | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Mobile audit available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Auditing mobile-friendliness...</div>;
+  if (!data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No mobile data</div>;
+
+  const { stats = {}, pages = [] } = data;
+  const vpPct = stats.total_pages > 0 ? ((stats.has_viewport / stats.total_pages) * 100).toFixed(0) : "0";
+  const respPct = stats.total_pages > 0 ? ((stats.responsive_viewport / stats.total_pages) * 100).toFixed(0) : "0";
+
+  return (
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: "Total Pages", value: stats.total_pages },
+          { label: "Has Viewport", value: stats.has_viewport, good: true },
+          { label: "Responsive", value: stats.responsive_viewport, good: true },
+          { label: "Missing Viewport", value: stats.missing_viewport, alert: stats.missing_viewport > 0 },
+        ].map((s, i) => (
+          <div key={i} className={`rounded-lg border p-2 text-center ${s.alert ? "bg-red-50 border-red-200" : s.good ? "bg-green-50 border-green-200" : "bg-white border-gray-200"}`}>
+            <div className={`text-lg font-bold ${s.alert ? "text-red-600" : s.good ? "text-green-600" : "text-gray-900"}`}>{s.value}</div>
+            <div className="text-[10px] text-gray-500">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Coverage bars */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-3">
+        <div>
+          <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+            <span>Viewport Meta Tag</span>
+            <span className="font-semibold">{vpPct}%</span>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-3">
+            <div className={`h-3 rounded-full transition-all ${Number(vpPct) >= 90 ? "bg-emerald-500" : Number(vpPct) >= 50 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${vpPct}%` }} />
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+            <span>Responsive (width=device-width)</span>
+            <span className="font-semibold">{respPct}%</span>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-3">
+            <div className={`h-3 rounded-full transition-all ${Number(respPct) >= 90 ? "bg-emerald-500" : Number(respPct) >= 50 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${respPct}%` }} />
+          </div>
+        </div>
+      </div>
+
+      {stats.missing_viewport > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800">
+          <strong>{stats.missing_viewport} pages</strong> are missing the viewport meta tag.
+          Without it, mobile browsers may render the page at desktop width, causing poor mobile experience and potential ranking issues.
+        </div>
+      )}
+
+      {/* Pages table */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-gray-50 z-10">
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="text-left py-1.5 px-2">URL</th>
+              <th className="text-center py-1.5 px-2 w-16">Viewport</th>
+              <th className="text-center py-1.5 px-2 w-20">Responsive</th>
+              <th className="text-left py-1.5 px-2 w-48">Viewport Value</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {pages.map((p: any, i: number) => (
+              <tr key={i} className={`hover:bg-gray-50/50 ${!p.has_viewport ? "bg-red-50/30" : ""}`}>
+                <td className="py-1.5 px-2 text-blue-600 truncate max-w-md" title={p.url}>
+                  {truncateUrl(p.url, 50)}
+                </td>
+                <td className="py-1.5 px-2 text-center">
+                  {p.has_viewport ? <span className="text-green-600">✓</span> : <span className="text-red-500">✗</span>}
+                </td>
+                <td className="py-1.5 px-2 text-center">
+                  {p.responsive_viewport ? <span className="text-green-600">✓</span> : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="py-1.5 px-2 text-gray-500 text-[10px] truncate max-w-[12rem]" title={p.viewport}>
+                  {p.viewport || <span className="text-red-400 italic">missing</span>}
                 </td>
               </tr>
             ))}

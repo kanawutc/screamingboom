@@ -782,6 +782,28 @@ async def get_og_audit(
     return await repo.get_og_audit(crawl_id, limit=limit)
 
 
+@router.get("/crawls/{crawl_id}/resources")
+async def get_resources_audit(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(300, ge=1, le=1000),
+) -> dict:
+    """Audit JS, CSS, and other non-HTML resources."""
+    repo = UrlRepository(db)
+    return await repo.get_resources_audit(crawl_id, limit=limit)
+
+
+@router.get("/crawls/{crawl_id}/mobile-audit")
+async def get_mobile_audit(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(200, ge=1, le=1000),
+) -> dict:
+    """Audit mobile-friendliness: viewport meta, responsive indicators."""
+    repo = UrlRepository(db)
+    return await repo.get_mobile_audit(crawl_id, limit=limit)
+
+
 @router.get("/crawls/{crawl_id}/orphan-pages")
 async def get_orphan_pages(
     crawl_id: uuid.UUID,

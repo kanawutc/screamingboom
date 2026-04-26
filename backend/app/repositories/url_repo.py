@@ -2310,3 +2310,132 @@ class UrlRepository:
             },
             "pages": pages,
         }
+
+    async def get_resources_audit(
+        self, crawl_id: uuid.UUID, limit: int = 300
+    ) -> dict[str, Any]:
+        """Audit JS, CSS, and other non-HTML resources."""
+        s = self._session
+
+        # Resource type breakdown
+        type_sql = text("""
+            SELECT
+                CASE
+                    WHEN content_type LIKE '%%javascript%%' THEN 'JavaScript'
+                    WHEN content_type LIKE '%%css%%' THEN 'CSS'
+                    WHEN content_type LIKE '%%image/%%' THEN 'Image'
+                    WHEN content_type LIKE '%%font%%' OR content_type LIKE '%%woff%%' THEN 'Font'
+                    WHEN content_type LIKE '%%pdf%%' THEN 'PDF'
+                    WHEN content_type LIKE '%%json%%' THEN 'JSON'
+                    WHEN content_type LIKE '%%xml%%' THEN 'XML'
+                    WHEN content_type LIKE '%%text/html%%' THEN 'HTML'
+                    ELSE 'Other'
+                END AS resource_type,
+                COUNT(*) AS count,
+                SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) AS ok_count,
+                SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) AS error_count,
+                AVG(response_time_ms)::int AS avg_response_ms
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+            GROUP BY resource_type
+            ORDER BY count DESC
+        """)
+        type_result = await s.execute(type_sql, {"crawl_id": str(crawl_id)})
+        types = [
+            {
+                "type": r.resource_type,
+                "count": r.count,
+                "ok_count": r.ok_count,
+                "error_count": r.error_count,
+                "avg_response_ms": r.avg_response_ms or 0,
+            }
+            for r in type_result.all()
+        ]
+
+        # Non-HTML resources list
+        resources_sql = text("""
+            SELECT
+                id, url, content_type, status_code, response_time_ms
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type NOT LIKE 'text/html%%'
+            ORDER BY
+                CASE
+                    WHEN status_code >= 400 THEN 0
+                    ELSE 1
+                END,
+                response_time_ms DESC NULLS LAST
+            LIMIT :limit
+        """)
+        resources_result = await s.execute(
+            resources_sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        resources = [
+            {
+                "url_id": str(r.id),
+                "url": r.url,
+                "content_type": r.content_type or "unknown",
+                "status_code": r.status_code,
+                "response_time_ms": r.response_time_ms or 0,
+            }
+            for r in resources_result.all()
+        ]
+
+        return {"types": types, "resources": resources}
+
+    async def get_mobile_audit(
+        self, crawl_id: uuid.UUID, limit: int = 200
+    ) -> dict[str, Any]:
+        """Audit mobile-friendliness: viewport meta, responsive indicators."""
+        s = self._session
+
+        # Check viewport meta tag presence from seo_data
+        sql = text("""
+            SELECT
+                id, url,
+                COALESCE(seo_data->>'title', '') AS title,
+                seo_data->>'viewport' AS viewport,
+                CASE WHEN seo_data->>'viewport' IS NOT NULL
+                     AND seo_data->>'viewport' != '' THEN true ELSE false END AS has_viewport,
+                CASE WHEN seo_data->>'viewport' LIKE '%%width=device-width%%' THEN true ELSE false END AS responsive_viewport,
+                word_count,
+                is_indexable
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+                AND content_type LIKE 'text/html%%'
+                AND status_code >= 200 AND status_code < 300
+            ORDER BY url
+            LIMIT :limit
+        """)
+        result = await s.execute(sql, {"crawl_id": str(crawl_id), "limit": limit})
+        rows = result.all()
+
+        pages = []
+        has_viewport_count = 0
+        responsive_count = 0
+        for r in rows:
+            if r.has_viewport:
+                has_viewport_count += 1
+            if r.responsive_viewport:
+                responsive_count += 1
+            pages.append({
+                "url_id": str(r.id),
+                "url": r.url,
+                "title": r.title or "",
+                "viewport": r.viewport or "",
+                "has_viewport": r.has_viewport,
+                "responsive_viewport": r.responsive_viewport,
+                "word_count": r.word_count or 0,
+                "is_indexable": r.is_indexable,
+            })
+
+        total = len(rows)
+        return {
+            "stats": {
+                "total_pages": total,
+                "has_viewport": has_viewport_count,
+                "responsive_viewport": responsive_count,
+                "missing_viewport": total - has_viewport_count,
+            },
+            "pages": pages,
+        }

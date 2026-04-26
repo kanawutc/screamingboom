@@ -179,6 +179,10 @@ class BatchInserter:
         if page_data.simhash:
             seo_data["simhash"] = page_data.simhash
 
+        # Viewport meta tag
+        if page_data.viewport:
+            seo_data["viewport"] = page_data.viewport
+
         # Sprint 4: Content analysis
         if page_data.text_ratio > 0:
             seo_data["text_ratio"] = page_data.text_ratio

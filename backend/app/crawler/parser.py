@@ -135,6 +135,9 @@ class PageData:
     readability_score: float | None = None  # Flesch Reading Ease (0-100)
     avg_words_per_sentence: float = 0.0
 
+    # Viewport meta tag
+    viewport: str | None = None
+
     # Phase 3E: Custom extraction rules results
     custom_extractions: dict = field(default_factory=dict)
     custom_search_results: dict = field(default_factory=dict)
@@ -192,6 +195,7 @@ class ParserPool:
         self._extract_pagination(tree, data, base_url)
         self._extract_structured_data(tree, data, base_url)
         self._extract_og_tags(tree, data)
+        self._extract_viewport(tree, data)
 
         # Content cleanup and metrics
         self._compute_word_count(tree, data)
@@ -294,6 +298,14 @@ class ParserPool:
                     if d and d not in directives:
                         directives.append(d)
         data.robots_meta = directives
+
+    def _extract_viewport(self, tree: HTMLParser, data: PageData) -> None:
+        """Extract <meta name="viewport"> content."""
+        vp_nodes = tree.css('meta[name="viewport"]')
+        if vp_nodes:
+            content = vp_nodes[0].attributes.get("content", "")
+            if content:
+                data.viewport = content.strip()
 
     def _extract_canonical(self, tree: HTMLParser, data: PageData, base_url: str) -> None:
         """4. Extract <link rel="canonical"> and count all canonical tags."""
