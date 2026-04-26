@@ -33,7 +33,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "site_structure" | "robots_txt" | "sitemaps" | "crawl_log" | "segments" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -65,6 +65,7 @@ const TABS: TabDef[] = [
   { key: "robots_txt", label: "Robots.txt", icon: <Bot className="h-3 w-3" /> },
   { key: "sitemaps", label: "Sitemaps", icon: <Map className="h-3 w-3" /> },
   { key: "crawl_log", label: "Crawl Log", icon: <FileText className="h-3 w-3" /> },
+  { key: "segments", label: "Segments", icon: <Sheet className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
 ];
 
@@ -201,6 +202,9 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
     { label: "Redirects", filter: { log_status: "redirects" } },
     { label: "Errors", filter: { log_status: "errors" } },
   ],
+  segments: [
+    { label: "All", filter: {} },
+  ],
   issues: [
     { label: "All", filter: {} },
     { label: "Critical", filter: { severity: "critical" } },
@@ -294,7 +298,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "site_structure" && activeTab !== "robots_txt" && activeTab !== "sitemaps" && activeTab !== "images" && activeTab !== "crawl_log" && activeTab !== "segments",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -455,6 +459,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-speed", crawlId],
     queryFn: () => urlsApi.crawlSpeed(crawlId),
     enabled: !!crawl && activeTab === "crawl_log" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: segmentsData, isLoading: segmentsLoading } = useQuery<any[]>({
+    queryKey: ["crawl-segments", crawlId],
+    queryFn: () => urlsApi.segments(crawlId),
+    enabled: !!crawl && activeTab === "segments" && isTerminal,
   });
 
   const { data: issueSummary } = useQuery({
@@ -702,6 +713,8 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <SitemapPanel data={sitemapData} loading={sitemapLoading} />
             ) : activeTab === "crawl_log" ? (
               <CrawlLogPanel data={timelineData} loading={timelineLoading} speedData={crawlSpeedData} onLoadMore={() => setLogCursor(timelineData?.next_cursor)} />
+            ) : activeTab === "segments" ? (
+              <SegmentsPanel data={segmentsData} loading={segmentsLoading} isTerminal={isTerminal} />
             ) : (
               <UrlTable urls={urls} loading={urlsLoading} activeTab={activeTab} selectedUrlId={selectedUrlId} onRowClick={handleRowClick} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             )}
@@ -717,7 +730,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
                   <button onClick={() => setLogCursor(timelineData?.next_cursor)} disabled={!timelineData?.next_cursor} className="px-2 py-0.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next &rarr;</button>
                 </div>
               </>
-            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" ? (
+            ) : activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" || activeTab === "site_structure" || activeTab === "segments" ? (
               <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
             ) : activeTab === "issues" ? (
               <>
@@ -2811,6 +2824,103 @@ function CrawlLogPanel({ data, loading, speedData, onLoadMore }: { data: any | u
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Segments Panel ─────────────────────────────────────────────────────
+function SegmentsPanel({ data, loading, isTerminal }: { data: any[] | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Segments available after crawl completes</div>;
+  if (loading && !data) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Analyzing URL segments...</div>;
+  if (!data || data.length === 0) return <div className="flex items-center justify-center h-64 text-sm text-gray-400">No segments found</div>;
+
+  const totalUrls = data.reduce((sum: number, s: any) => sum + s.url_count, 0);
+  const maxUrls = Math.max(...data.map((s: any) => s.url_count));
+
+  return (
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      {/* Summary */}
+      <div className="flex items-center gap-3 text-xs text-gray-600">
+        <span className="font-semibold">{data.length} segments</span>
+        <span>·</span>
+        <span>{totalUrls.toLocaleString()} total URLs</span>
+      </div>
+
+      {/* Segment distribution bar */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <h3 className="text-xs font-semibold text-gray-700 mb-2">URL Distribution</h3>
+        <div className="flex rounded-full overflow-hidden h-6">
+          {data.slice(0, 12).map((seg: any, i: number) => {
+            const colors = ["bg-blue-500", "bg-green-500", "bg-yellow-500", "bg-purple-500", "bg-pink-500", "bg-indigo-500", "bg-teal-500", "bg-orange-500", "bg-red-400", "bg-cyan-500", "bg-emerald-500", "bg-amber-500"];
+            const pct = totalUrls > 0 ? (seg.url_count / totalUrls) * 100 : 0;
+            return (
+              <div
+                key={i}
+                className={`${colors[i % colors.length]} transition-all hover:opacity-80`}
+                style={{ width: `${Math.max(pct, 1)}%` }}
+                title={`${seg.segment}: ${seg.url_count} URLs (${pct.toFixed(1)}%)`}
+              />
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {data.slice(0, 12).map((seg: any, i: number) => {
+            const dotColors = ["bg-blue-500", "bg-green-500", "bg-yellow-500", "bg-purple-500", "bg-pink-500", "bg-indigo-500", "bg-teal-500", "bg-orange-500", "bg-red-400", "bg-cyan-500", "bg-emerald-500", "bg-amber-500"];
+            return (
+              <span key={i} className="flex items-center gap-1 text-[10px] text-gray-600">
+                <span className={`w-2 h-2 rounded-full ${dotColors[i % dotColors.length]}`} />
+                {seg.segment} ({seg.url_count})
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Segments table */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-gray-50 z-10">
+            <tr className="border-b border-gray-200 text-gray-500">
+              <th className="text-left py-1.5 px-2">Segment</th>
+              <th className="text-right py-1.5 px-2 w-16">URLs</th>
+              <th className="text-left py-1.5 px-2 w-32">Distribution</th>
+              <th className="text-right py-1.5 px-2 w-14">2xx</th>
+              <th className="text-right py-1.5 px-2 w-14">3xx</th>
+              <th className="text-right py-1.5 px-2 w-14">4xx+</th>
+              <th className="text-right py-1.5 px-2 w-16">Health</th>
+              <th className="text-right py-1.5 px-2 w-16">Index%</th>
+              <th className="text-right py-1.5 px-2 w-16">Avg Speed</th>
+              <th className="text-right py-1.5 px-2 w-16">Avg Words</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {data.map((seg: any, i: number) => {
+              const pct = maxUrls > 0 ? (seg.url_count / maxUrls) * 100 : 0;
+              const healthColor = seg.health_pct >= 90 ? "text-green-700" : seg.health_pct >= 70 ? "text-yellow-700" : "text-red-700";
+              const indexColor = seg.index_pct >= 80 ? "text-green-700" : seg.index_pct >= 50 ? "text-yellow-700" : "text-red-700";
+              const speedColor = (seg.avg_response_ms ?? 0) > 1000 ? "text-red-600" : (seg.avg_response_ms ?? 0) > 500 ? "text-yellow-600" : "text-green-700";
+              return (
+                <tr key={i} className="hover:bg-gray-50/50">
+                  <td className="py-1.5 px-2 font-mono font-medium text-gray-800">{seg.segment}</td>
+                  <td className="py-1.5 px-2 text-right font-semibold">{seg.url_count}</td>
+                  <td className="py-1.5 px-2">
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                  </td>
+                  <td className="py-1.5 px-2 text-right text-green-700">{seg.ok_count}</td>
+                  <td className="py-1.5 px-2 text-right text-blue-600">{seg.redirect_count}</td>
+                  <td className="py-1.5 px-2 text-right text-red-600">{seg.error_count}</td>
+                  <td className={`py-1.5 px-2 text-right font-semibold ${healthColor}`}>{seg.health_pct}%</td>
+                  <td className={`py-1.5 px-2 text-right ${indexColor}`}>{seg.index_pct}%</td>
+                  <td className={`py-1.5 px-2 text-right font-mono ${speedColor}`}>{seg.avg_response_ms ? `${seg.avg_response_ms}ms` : "-"}</td>
+                  <td className="py-1.5 px-2 text-right text-gray-600">{seg.avg_word_count ?? "-"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

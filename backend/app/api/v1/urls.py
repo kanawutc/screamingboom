@@ -607,6 +607,16 @@ async def get_crawl_speed(
     return await repo.get_crawl_speed_chart(crawl_id)
 
 
+@router.get("/crawls/{crawl_id}/segments")
+async def get_url_segments(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+) -> list[dict]:
+    """Get URL segments auto-detected by first path directory."""
+    repo = UrlRepository(db)
+    return await repo.get_url_segments(crawl_id)
+
+
 @router.get("/crawls/{crawl_id}/heading-hierarchy")
 async def get_heading_hierarchy(
     crawl_id: uuid.UUID,

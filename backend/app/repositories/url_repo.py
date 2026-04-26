@@ -1484,6 +1484,56 @@ class UrlRepository:
             for r in result.all()
         ]
 
+    async def get_url_segments(
+        self,
+        crawl_id: uuid.UUID,
+    ) -> list[dict[str, Any]]:
+        """Auto-detect URL segments by first path directory."""
+        sql = text("""
+            WITH parsed AS (
+                SELECT
+                    CASE
+                        WHEN position('/' in substring(url from 'https?://[^/]+(/.*)')) > 1
+                        THEN '/' || split_part(substring(url from 'https?://[^/]+/([^?#]*)'), '/', 1)
+                        ELSE '/'
+                    END AS segment,
+                    status_code,
+                    response_time_ms,
+                    is_indexable,
+                    word_count
+                FROM crawled_urls
+                WHERE crawl_id = :crawl_id
+            )
+            SELECT
+                segment,
+                COUNT(*) AS url_count,
+                COUNT(*) FILTER (WHERE status_code BETWEEN 200 AND 299) AS ok_count,
+                COUNT(*) FILTER (WHERE status_code >= 400 OR status_code = 0) AS error_count,
+                COUNT(*) FILTER (WHERE status_code BETWEEN 300 AND 399) AS redirect_count,
+                COUNT(*) FILTER (WHERE is_indexable = true) AS indexable_count,
+                ROUND(AVG(response_time_ms)::numeric, 1) AS avg_response_ms,
+                ROUND(AVG(word_count)::numeric, 0) AS avg_word_count
+            FROM parsed
+            GROUP BY segment
+            ORDER BY url_count DESC
+        """)
+        result = await self._session.execute(sql, {"crawl_id": str(crawl_id)})
+        return [
+            {
+                "segment": r.segment,
+                "url_count": r.url_count,
+                "ok_count": r.ok_count,
+                "error_count": r.error_count,
+                "redirect_count": r.redirect_count,
+                "indexable_count": r.indexable_count,
+                "avg_response_ms": float(r.avg_response_ms) if r.avg_response_ms else None,
+                "avg_word_count": int(r.avg_word_count) if r.avg_word_count else None,
+                "health_pct": round(r.ok_count / r.url_count * 100, 1) if r.url_count > 0 else 0,
+                "index_pct": round(r.indexable_count / r.url_count * 100, 1) if r.url_count > 0 else 0,
+            }
+            for r in result.all()
+        ]
+
     async def get_hreflang_data(
         self,
         crawl_id: uuid.UUID,

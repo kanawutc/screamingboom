@@ -280,6 +280,10 @@ export const urlsApi = {
   crawlSpeed: (crawlId: string) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any[]>(`/crawls/${crawlId}/crawl-speed`),
+
+  segments: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any[]>(`/crawls/${crawlId}/segments`),
 };
 
 export const extractionRulesApi = {
