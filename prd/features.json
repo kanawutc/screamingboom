@@ -204,16 +204,25 @@
       "id": "1.12",
       "phase": 1,
       "name": "Authentication",
-      "status": "planned",
+      "status": "done",
       "priority": "critical",
-      "backend": false,
-      "frontend": false,
-      "files_backend": [],
-      "files_frontend": [],
+      "backend": true,
+      "frontend": true,
+      "files_backend": [
+        "app/schemas/crawl.py",
+        "app/crawler/fetcher.py",
+        "app/crawler/engine.py",
+        "app/services/crawl_service.py",
+        "app/worker/tasks/crawl_tasks.py"
+      ],
+      "files_frontend": [
+        "app/(dashboard)/crawls/new/page.tsx",
+        "types/index.ts"
+      ],
       "depends_on": [
         "1.1"
       ],
-      "notes": "HTTP Basic/Digest and form-based login for crawling protected sites."
+      "notes": "HTTP Basic Auth, Bearer Token, custom headers. Config stored in crawl JSON."
     },
     {
       "id": "2.1",
