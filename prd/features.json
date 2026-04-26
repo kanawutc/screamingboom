@@ -1045,30 +1045,44 @@
       "id": "6.3",
       "phase": 6,
       "name": "Automated Alerts & Monitoring",
-      "status": "planned",
+      "status": "done",
       "priority": "enhancement",
-      "backend": false,
-      "frontend": false,
-      "files_backend": [],
-      "files_frontend": [],
+      "backend": true,
+      "frontend": true,
+      "files_backend": [
+        "app/models/alert.py",
+        "app/services/alert_service.py",
+        "app/api/v1/alerts.py",
+        "app/worker/tasks/crawl_tasks.py"
+      ],
+      "files_frontend": [
+        "app/(dashboard)/alerts/page.tsx",
+        "components/layout/Sidebar.tsx"
+      ],
       "depends_on": [
         "5.4",
         "3.10"
-      ]
+      ],
+      "notes": "Alert model, AlertService with regression detection, auto-runs after crawl, CRUD API, frontend alerts page with badge"
     },
     {
       "id": "6.4",
       "phase": 6,
       "name": "SEO Audit Report Generator",
-      "status": "planned",
+      "status": "done",
       "priority": "enhancement",
-      "backend": false,
-      "frontend": false,
-      "files_backend": [],
-      "files_frontend": [],
+      "backend": true,
+      "frontend": true,
+      "files_backend": [
+        "app/api/v1/urls.py"
+      ],
+      "files_frontend": [
+        "app/(dashboard)/crawls/[crawlId]/page.tsx"
+      ],
       "depends_on": [
         "5.2"
-      ]
+      ],
+      "notes": "HTML audit report endpoint with styled print layout + frontend button"
     },
     {
       "id": "6.5",
