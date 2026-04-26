@@ -82,5 +82,23 @@ class CrawledUrl(Base):
             return self.seo_data.get("link_score")
         return None
 
+    @property
+    def text_ratio(self) -> float | None:
+        if self.seo_data and isinstance(self.seo_data, dict):
+            return self.seo_data.get("text_ratio")
+        return None
+
+    @property
+    def readability_score(self) -> float | None:
+        if self.seo_data and isinstance(self.seo_data, dict):
+            return self.seo_data.get("readability_score")
+        return None
+
+    @property
+    def avg_words_per_sentence(self) -> float | None:
+        if self.seo_data and isinstance(self.seo_data, dict):
+            return self.seo_data.get("avg_words_per_sentence")
+        return None
+
     def __repr__(self) -> str:
         return f"<CrawledUrl(id={self.id}, url={self.url!r}, status={self.status_code})>"

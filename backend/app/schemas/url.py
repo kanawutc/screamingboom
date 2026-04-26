@@ -32,6 +32,9 @@ class CrawledUrlResponse(BaseModel):
     response_time_ms: int | None = None
     redirect_url: str | None = None
     link_score: int | None = None
+    text_ratio: float | None = None
+    readability_score: float | None = None
+    avg_words_per_sentence: float | None = None
     crawled_at: datetime
 
 

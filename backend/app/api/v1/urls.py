@@ -205,6 +205,9 @@ EXPORT_COLUMNS = [
     "response_time_ms",
     "redirect_url",
     "link_score",
+    "text_ratio",
+    "readability_score",
+    "avg_words_per_sentence",
 ]
 
 
