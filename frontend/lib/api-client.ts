@@ -284,6 +284,10 @@ export const urlsApi = {
   segments: (crawlId: string) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any[]>(`/crawls/${crawlId}/segments`),
+
+  quickWins: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any[]>(`/crawls/${crawlId}/quick-wins`),
 };
 
 export const extractionRulesApi = {

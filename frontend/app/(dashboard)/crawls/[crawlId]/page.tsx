@@ -468,6 +468,13 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     enabled: !!crawl && activeTab === "segments" && isTerminal,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: quickWinsData } = useQuery<any[]>({
+    queryKey: ["crawl-quick-wins", crawlId],
+    queryFn: () => urlsApi.quickWins(crawlId),
+    enabled: !!crawl && activeTab === "overview" && isTerminal,
+  });
+
   const { data: issueSummary } = useQuery({
     queryKey: ["crawl-issues-summary", crawlId],
     queryFn: () => issuesApi.summary(crawlId),
@@ -674,7 +681,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-auto">
             {activeTab === "overview" ? (
-              <OverviewPanel crawl={crawl} crawledCount={crawledCount} errorCount={errorCount} issueSummary={issueSummary} healthScore={healthScore} perfData={perfData} urlsPerSec={urlsPerSec} elapsed={elapsed} isTerminal={isTerminal} overviewStats={overviewStatsData} />
+              <OverviewPanel crawl={crawl} crawledCount={crawledCount} errorCount={errorCount} issueSummary={issueSummary} healthScore={healthScore} perfData={perfData} urlsPerSec={urlsPerSec} elapsed={elapsed} isTerminal={isTerminal} overviewStats={overviewStatsData} quickWins={quickWinsData} />
             ) : activeTab === "issues" ? (
               <IssuesTable issues={issues} loading={issuesLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             ) : activeTab === "external" ? (
@@ -2106,10 +2113,10 @@ function HreflangPanel({ data, loading, isTerminal }: { data: any[] | undefined;
 
 // ─── Overview Panel ───────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function OverviewPanel({ crawl, crawledCount, errorCount, issueSummary, healthScore, perfData, urlsPerSec, elapsed, isTerminal, overviewStats }: {
+function OverviewPanel({ crawl, crawledCount, errorCount, issueSummary, healthScore, perfData, urlsPerSec, elapsed, isTerminal, overviewStats, quickWins }: {
   crawl: Crawl; crawledCount: number; errorCount: number;
   issueSummary: any; healthScore: any; perfData: any;
-  urlsPerSec: number | null; elapsed: number | null; isTerminal: boolean; overviewStats?: any;
+  urlsPerSec: number | null; elapsed: number | null; isTerminal: boolean; overviewStats?: any; quickWins?: any[];
 }) {
   const config = crawl.config as Record<string, any>;
   const score = healthScore?.score ?? null;
@@ -2286,6 +2293,41 @@ function OverviewPanel({ crawl, crawledCount, errorCount, issueSummary, healthSc
               );
             })()}
           </div>
+        </div>
+      )}
+
+      {/* Quick Wins */}
+      {quickWins && quickWins.length > 0 && (
+        <div className="bg-white rounded-lg border border-amber-200 p-4">
+          <h3 className="text-xs font-semibold text-amber-800 mb-3">Quick Wins &amp; Action Items</h3>
+          <div className="space-y-2">
+            {quickWins.map((win: any, i: number) => {
+              const priorityBadge = win.priority === "critical"
+                ? "bg-red-100 text-red-700 border-red-200"
+                : win.priority === "warning"
+                ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                : "bg-blue-100 text-blue-700 border-blue-200";
+              const impactBadge = win.impact === "high"
+                ? "text-red-600"
+                : win.impact === "medium"
+                ? "text-amber-600"
+                : "text-gray-500";
+              return (
+                <div key={i} className="flex items-center gap-3 py-1.5 border-b border-gray-100 last:border-0">
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold border ${priorityBadge}`}>
+                    {win.priority}
+                  </span>
+                  <span className="flex-1 text-[11px] text-gray-800">{win.action}</span>
+                  <span className={`text-[10px] font-medium ${impactBadge}`}>Impact: {win.impact}</span>
+                  <span className="text-[10px] text-gray-400">Effort: {win.effort}</span>
+                  <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{win.category}</span>
+                </div>
+              );
+            })}
+          </div>
+          {quickWins.length === 0 && (
+            <div className="text-[11px] text-green-700 italic">No action items — great SEO health!</div>
+          )}
         </div>
       )}
 

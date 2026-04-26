@@ -1484,6 +1484,202 @@ class UrlRepository:
             for r in result.all()
         ]
 
+    async def get_quick_wins(
+        self,
+        crawl_id: uuid.UUID,
+    ) -> list[dict[str, Any]]:
+        """Generate prioritized SEO quick wins / action items."""
+        actions: list[dict[str, Any]] = []
+
+        # 1. Missing titles
+        title_sql = text("""
+            SELECT COUNT(*) AS cnt FROM url_issues
+            WHERE crawl_id = :cid AND issue_type = 'missing_title'
+        """)
+        r = await self._session.execute(title_sql, {"cid": str(crawl_id)})
+        cnt = r.scalar_one()
+        if cnt > 0:
+            actions.append({
+                "priority": "critical",
+                "category": "titles",
+                "action": f"Add page titles to {cnt} page{'s' if cnt > 1 else ''}",
+                "impact": "high",
+                "effort": "low",
+                "issue_type": "missing_title",
+                "count": cnt,
+            })
+
+        # 2. Missing meta descriptions
+        meta_sql = text("""
+            SELECT COUNT(*) AS cnt FROM url_issues
+            WHERE crawl_id = :cid AND issue_type = 'missing_meta_description'
+        """)
+        r = await self._session.execute(meta_sql, {"cid": str(crawl_id)})
+        cnt = r.scalar_one()
+        if cnt > 0:
+            actions.append({
+                "priority": "critical",
+                "category": "meta",
+                "action": f"Write meta descriptions for {cnt} page{'s' if cnt > 1 else ''}",
+                "impact": "high",
+                "effort": "medium",
+                "issue_type": "missing_meta_description",
+                "count": cnt,
+            })
+
+        # 3. Missing H1
+        h1_sql = text("""
+            SELECT COUNT(*) AS cnt FROM url_issues
+            WHERE crawl_id = :cid AND issue_type = 'missing_h1'
+        """)
+        r = await self._session.execute(h1_sql, {"cid": str(crawl_id)})
+        cnt = r.scalar_one()
+        if cnt > 0:
+            actions.append({
+                "priority": "critical",
+                "category": "headings",
+                "action": f"Add H1 heading to {cnt} page{'s' if cnt > 1 else ''}",
+                "impact": "high",
+                "effort": "low",
+                "issue_type": "missing_h1",
+                "count": cnt,
+            })
+
+        # 4. Missing alt text
+        img_sql = text("""
+            SELECT COUNT(*) AS cnt FROM url_issues
+            WHERE crawl_id = :cid AND issue_type = 'missing_alt_text'
+        """)
+        r = await self._session.execute(img_sql, {"cid": str(crawl_id)})
+        cnt = r.scalar_one()
+        if cnt > 0:
+            actions.append({
+                "priority": "warning",
+                "category": "images",
+                "action": f"Add alt text to images on {cnt} page{'s' if cnt > 1 else ''}",
+                "impact": "medium",
+                "effort": "low",
+                "issue_type": "missing_alt_text",
+                "count": cnt,
+            })
+
+        # 5. Slow pages (>1s)
+        slow_sql = text("""
+            SELECT COUNT(*) AS cnt FROM crawled_urls
+            WHERE crawl_id = :cid AND response_time_ms > 1000
+              AND status_code BETWEEN 200 AND 299
+        """)
+        r = await self._session.execute(slow_sql, {"cid": str(crawl_id)})
+        cnt = r.scalar_one()
+        if cnt > 0:
+            actions.append({
+                "priority": "warning",
+                "category": "performance",
+                "action": f"Optimize {cnt} slow page{'s' if cnt > 1 else ''} (>1s response)",
+                "impact": "medium",
+                "effort": "high",
+                "count": cnt,
+            })
+
+        # 6. Long redirect chains
+        chain_sql = text("""
+            SELECT COUNT(*) AS cnt FROM crawled_urls
+            WHERE crawl_id = :cid
+              AND redirect_chain IS NOT NULL
+              AND jsonb_array_length(redirect_chain) > 2
+        """)
+        r = await self._session.execute(chain_sql, {"cid": str(crawl_id)})
+        cnt = r.scalar_one()
+        if cnt > 0:
+            actions.append({
+                "priority": "warning",
+                "category": "redirects",
+                "action": f"Shorten {cnt} redirect chain{'s' if cnt > 1 else ''} (>2 hops)",
+                "impact": "medium",
+                "effort": "medium",
+                "count": cnt,
+            })
+
+        # 7. Duplicate titles
+        dup_title_sql = text("""
+            SELECT COUNT(*) AS cnt FROM url_issues
+            WHERE crawl_id = :cid AND issue_type = 'duplicate_title'
+        """)
+        r = await self._session.execute(dup_title_sql, {"cid": str(crawl_id)})
+        cnt = r.scalar_one()
+        if cnt > 0:
+            actions.append({
+                "priority": "warning",
+                "category": "titles",
+                "action": f"Make {cnt} duplicate title{'s' if cnt > 1 else ''} unique",
+                "impact": "medium",
+                "effort": "medium",
+                "issue_type": "duplicate_title",
+                "count": cnt,
+            })
+
+        # 8. Non-indexable pages that should be indexed
+        noindex_sql = text("""
+            SELECT COUNT(*) AS cnt FROM crawled_urls
+            WHERE crawl_id = :cid AND is_indexable = false
+              AND status_code BETWEEN 200 AND 299
+              AND content_type LIKE 'text/html%%'
+        """)
+        r = await self._session.execute(noindex_sql, {"cid": str(crawl_id)})
+        cnt = r.scalar_one()
+        if cnt > 0:
+            actions.append({
+                "priority": "info",
+                "category": "indexability",
+                "action": f"Review {cnt} non-indexable HTML page{'s' if cnt > 1 else ''}",
+                "impact": "medium",
+                "effort": "low",
+                "count": cnt,
+            })
+
+        # 9. Missing canonical
+        canon_sql = text("""
+            SELECT COUNT(*) AS cnt FROM url_issues
+            WHERE crawl_id = :cid AND issue_type = 'missing_canonical'
+        """)
+        r = await self._session.execute(canon_sql, {"cid": str(crawl_id)})
+        cnt = r.scalar_one()
+        if cnt > 0:
+            actions.append({
+                "priority": "info",
+                "category": "canonicals",
+                "action": f"Add canonical tags to {cnt} page{'s' if cnt > 1 else ''}",
+                "impact": "medium",
+                "effort": "low",
+                "issue_type": "missing_canonical",
+                "count": cnt,
+            })
+
+        # 10. Thin content (word count < 100)
+        thin_sql = text("""
+            SELECT COUNT(*) AS cnt FROM crawled_urls
+            WHERE crawl_id = :cid AND word_count IS NOT NULL AND word_count < 100
+              AND status_code BETWEEN 200 AND 299
+              AND content_type LIKE 'text/html%%'
+        """)
+        r = await self._session.execute(thin_sql, {"cid": str(crawl_id)})
+        cnt = r.scalar_one()
+        if cnt > 0:
+            actions.append({
+                "priority": "info",
+                "category": "content",
+                "action": f"Add content to {cnt} thin page{'s' if cnt > 1 else ''} (<100 words)",
+                "impact": "medium",
+                "effort": "high",
+                "count": cnt,
+            })
+
+        # Sort by priority: critical > warning > info, then by count desc
+        priority_order = {"critical": 0, "warning": 1, "info": 2}
+        actions.sort(key=lambda a: (priority_order.get(a["priority"], 3), -a["count"]))
+
+        return actions
+
     async def get_url_segments(
         self,
         crawl_id: uuid.UUID,
