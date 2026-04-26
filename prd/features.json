@@ -934,32 +934,45 @@
       "id": "5.4",
       "phase": 5,
       "name": "Scheduling",
-      "status": "planned",
+      "status": "done",
       "priority": "nice-to-have",
       "backend": false,
       "frontend": false,
-      "files_backend": [],
-      "files_frontend": [],
+      "files_backend": [
+        "app/models/schedule.py",
+        "app/repositories/schedule_repo.py",
+        "app/services/schedule_service.py",
+        "app/api/v1/schedules.py",
+        "app/worker/tasks/schedule_tasks.py"
+      ],
+      "files_frontend": [
+        "app/(dashboard)/schedules/page.tsx"
+      ],
       "depends_on": [
         "1.1"
-      ]
+      ],
+      "notes": "Full-stack: CrawlSchedule model, CRUD API, ARQ cron task, frontend schedule page with presets"
     },
     {
       "id": "5.5",
       "phase": 5,
       "name": "Configuration Profiles",
-      "status": "partial",
+      "status": "done",
       "priority": "nice-to-have",
-      "backend": false,
+      "backend": true,
       "frontend": true,
-      "files_backend": [],
+      "files_backend": [
+        "app/models/config_profile.py",
+        "app/api/v1/config_profiles.py"
+      ],
       "files_frontend": [
+        "app/(dashboard)/crawls/new/page.tsx",
         "app/(dashboard)/settings/page.tsx"
       ],
       "depends_on": [
         "1.1"
       ],
-      "notes": "Frontend saves defaults to localStorage. No backend profile storage."
+      "notes": "Full-stack: ConfigProfile model, CRUD API with seed profiles, profile selector in New Crawl page"
     },
     {
       "id": "5.6",

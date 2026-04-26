@@ -30,8 +30,9 @@ SEO Spider: self-hosted Screaming Frog clone. Crawls websites, detects SEO issue
 - Phase 3 (Advanced Audits): **MOSTLY COMPLETE** — 10/15 features done
 - Phase 4-6: **IN PROGRESS**
 - Phase 3 (Advanced Audits): **NEARLY COMPLETE** — 12/15 features done
-- Frontend: 42 tabs + Compare page + Health Score sidebar
-- Backend: 70+ API endpoints, crawl engine, 15 analysis modules
+- Phase 5 (Workflow): **IN PROGRESS** — Scheduling (5.4) + Config Profiles (5.5) done
+- Frontend: 42 tabs + Compare page + Health Score sidebar + Schedules page
+- Backend: 80+ API endpoints, crawl engine, 15 analysis modules, schedule worker
 
 ## Critical Rules
 
