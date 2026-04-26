@@ -106,6 +106,74 @@ async def get_project_stats(project_id: uuid.UUID, db: DbSession) -> dict:
     }
 
 
+@router.get("/{project_id}/trends")
+async def get_project_trends(project_id: uuid.UUID, db: DbSession) -> dict:
+    """Get trend data across crawls for a project: URLs, errors, issues, response times."""
+    sql = text("""
+        SELECT
+            c.id AS crawl_id,
+            c.status,
+            c.started_at,
+            c.completed_at,
+            c.crawled_urls_count,
+            c.error_count,
+            c.total_urls,
+            EXTRACT(EPOCH FROM (c.completed_at - c.started_at))::int AS duration_secs
+        FROM crawls c
+        WHERE c.project_id = :project_id
+          AND c.status = 'completed'
+        ORDER BY c.started_at ASC
+        LIMIT 50
+    """)
+    result = await db.execute(sql, {"project_id": str(project_id)})
+    crawls = result.all()
+
+    trends: list[dict] = []
+    for r in crawls:
+        crawl_id = r.crawl_id
+        # Get issue counts per crawl
+        issue_sql = text("""
+            SELECT
+                COUNT(*) AS total_issues,
+                COUNT(*) FILTER (WHERE severity = 'critical') AS critical,
+                COUNT(*) FILTER (WHERE severity = 'warning') AS warnings
+            FROM url_issues
+            WHERE crawl_id = :crawl_id
+        """)
+        issue_result = await db.execute(issue_sql, {"crawl_id": str(crawl_id)})
+        issue_row = issue_result.one_or_none()
+
+        # Get avg response time per crawl
+        perf_sql = text("""
+            SELECT
+                AVG(response_time_ms)::int AS avg_response_ms,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY response_time_ms)::int AS p50_ms
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND response_time_ms IS NOT NULL
+              AND status_code IS NOT NULL
+              AND status_code < 400
+        """)
+        perf_result = await db.execute(perf_sql, {"crawl_id": str(crawl_id)})
+        perf_row = perf_result.one_or_none()
+
+        trends.append({
+            "crawl_id": str(crawl_id),
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+            "urls_crawled": r.crawled_urls_count,
+            "errors": r.error_count,
+            "total_issues": issue_row.total_issues if issue_row else 0,
+            "critical_issues": issue_row.critical if issue_row else 0,
+            "warnings": issue_row.warnings if issue_row else 0,
+            "avg_response_ms": perf_row.avg_response_ms if perf_row else None,
+            "p50_response_ms": perf_row.p50_ms if perf_row else None,
+            "duration_secs": r.duration_secs,
+        })
+
+    return {"project_id": str(project_id), "trends": trends}
+
+
 @router.delete("/{project_id}", status_code=204)
 async def delete_project(project_id: uuid.UUID, db: DbSession) -> None:
     """Delete a project and all its crawl data."""

@@ -101,6 +101,10 @@ export const projectsApi = {
   stats: (id: string) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>(`/projects/${id}/stats`),
+
+  trends: (id: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/projects/${id}/trends`),
 };
 
 export const crawlsApi = {

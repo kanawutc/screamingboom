@@ -332,7 +332,11 @@ export default function DashboardPage() {
               <TableBody>
                 {projectsWithStats.map((p) => (
                   <TableRow key={p.id} className={p.crawlCount === 0 ? "opacity-50" : ""}>
-                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link href={`/projects/${p.id}`} className="hover:text-[#6cc04a] hover:underline">
+                        {p.name}
+                      </Link>
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground font-mono max-w-[200px] truncate">{p.domain}</TableCell>
                     <TableCell className="text-right">
                       {p.crawlCount > 0 ? (
