@@ -570,6 +570,73 @@ export default function NewCrawlPage() {
             </p>
           </div>
 
+          {/* URL Rewriting */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium">URL Rewrite Rules</label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  updateConfig({
+                    url_rewrites: [
+                      ...config.url_rewrites,
+                      { pattern: "", replacement: "" },
+                    ],
+                  })
+                }
+                className="gap-1 h-7 text-xs"
+              >
+                <Plus className="h-3 w-3" />
+                Add Rule
+              </Button>
+            </div>
+            {config.url_rewrites.length > 0 ? (
+              <div className="space-y-2">
+                {config.url_rewrites.map((rule, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Input
+                      placeholder="Regex pattern (e.g. /page/(\d+))"
+                      value={rule.pattern}
+                      onChange={(e) => {
+                        const rules = [...config.url_rewrites];
+                        rules[i] = { ...rules[i], pattern: e.target.value };
+                        updateConfig({ url_rewrites: rules });
+                      }}
+                      className="font-mono text-xs flex-1"
+                    />
+                    <span className="text-xs text-gray-400">→</span>
+                    <Input
+                      placeholder="Replacement (e.g. /p/$1)"
+                      value={rule.replacement}
+                      onChange={(e) => {
+                        const rules = [...config.url_rewrites];
+                        rules[i] = { ...rules[i], replacement: e.target.value };
+                        updateConfig({ url_rewrites: rules });
+                      }}
+                      className="font-mono text-xs flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        updateConfig({
+                          url_rewrites: config.url_rewrites.filter((_, j) => j !== i),
+                        })
+                      }
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Rewrite URLs before crawling using regex patterns. Useful for normalizing dynamic URLs.
+              </p>
+            )}
+          </div>
+
           {/* JS Rendering Toggle */}
           <div className="flex items-center gap-2">
             <input
