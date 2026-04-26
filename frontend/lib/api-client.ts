@@ -224,6 +224,18 @@ export const urlsApi = {
   contentAnalysis: (crawlId: string, limit = 100) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any[]>(`/crawls/${crawlId}/content-analysis${qs({ limit })}`),
+
+  cookiesAudit: (crawlId: string, limit = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any[]>(`/crawls/${crawlId}/cookies${qs({ limit })}`),
+
+  securityOverview: (crawlId: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>(`/crawls/${crawlId}/security`),
+
+  hreflang: (crawlId: string, limit = 200) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any[]>(`/crawls/${crawlId}/hreflang${qs({ limit })}`),
 };
 
 export const extractionRulesApi = {

@@ -890,3 +890,99 @@ class UrlRepository:
             }
             for r in result.all()
         ]
+
+    async def get_cookies_audit(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 200,
+    ) -> list[dict]:
+        """Get pages that set cookies with their cookie details."""
+        sql = text("""
+            SELECT id, url, seo_data->'cookies' AS cookies
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND seo_data->'cookies' IS NOT NULL
+              AND jsonb_array_length(seo_data->'cookies') > 0
+            ORDER BY jsonb_array_length(seo_data->'cookies') DESC
+            LIMIT :limit
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        return [
+            {
+                "url_id": str(r.id),
+                "url": r.url,
+                "cookies": r.cookies,
+            }
+            for r in result.all()
+        ]
+
+    async def get_security_overview(
+        self,
+        crawl_id: uuid.UUID,
+    ) -> dict:
+        """Get security overview: HTTPS adoption, header coverage."""
+        protocol_sql = text("""
+            SELECT
+                COUNT(*) FILTER (WHERE url LIKE 'https://%%') AS https_count,
+                COUNT(*) FILTER (WHERE url LIKE 'http://%%') AS http_count,
+                COUNT(*) AS total
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND status_code BETWEEN 200 AND 299
+        """)
+        protocol_result = await self._session.execute(
+            protocol_sql, {"crawl_id": str(crawl_id)}
+        )
+        proto = protocol_result.one()
+
+        header_sql = text("""
+            SELECT issue_type, COUNT(*) AS cnt
+            FROM url_issues
+            WHERE crawl_id = :crawl_id
+              AND issue_type IN (
+                'missing_hsts', 'missing_csp',
+                'missing_x_content_type_options', 'missing_x_frame_options',
+                'http_url', 'mixed_content'
+              )
+            GROUP BY issue_type
+        """)
+        header_result = await self._session.execute(
+            header_sql, {"crawl_id": str(crawl_id)}
+        )
+        header_counts = {r.issue_type: r.cnt for r in header_result.all()}
+
+        return {
+            "https_count": proto.https_count,
+            "http_count": proto.http_count,
+            "total_pages": proto.total,
+            "issue_counts": header_counts,
+        }
+
+    async def get_hreflang_data(
+        self,
+        crawl_id: uuid.UUID,
+        limit: int = 200,
+    ) -> list[dict]:
+        """Get pages with hreflang tags."""
+        sql = text("""
+            SELECT id, url, seo_data->'hreflang' AS hreflang
+            FROM crawled_urls
+            WHERE crawl_id = :crawl_id
+              AND seo_data->'hreflang' IS NOT NULL
+              AND jsonb_array_length(seo_data->'hreflang') > 0
+            ORDER BY url
+            LIMIT :limit
+        """)
+        result = await self._session.execute(
+            sql, {"crawl_id": str(crawl_id), "limit": limit}
+        )
+        return [
+            {
+                "url_id": str(r.id),
+                "url": r.url,
+                "hreflang": r.hreflang,
+            }
+            for r in result.all()
+        ]

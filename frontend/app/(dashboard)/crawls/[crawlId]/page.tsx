@@ -13,7 +13,7 @@ import {
   Pause, Play, Square, Trash2, ArrowLeft, ExternalLink as ExternalLinkIcon, Globe,
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
   X, Download, Search, Link2, Shield, Navigation, FileCode2, Sheet, Braces,
-  FastForward, Network, Copy,
+  FastForward, Network, Copy, Cookie, Lock, Languages,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -33,7 +33,7 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "internal" | "external" | "response_codes" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "links_analysis" | "duplicates" | "issues";
+type TabKey = "internal" | "external" | "response_codes" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
@@ -53,6 +53,9 @@ const TABS: TabDef[] = [
   { key: "pagination", label: "Pagination", icon: <Navigation className="h-3 w-3" /> },
   { key: "custom_search", label: "Custom Search", icon: <Search className="h-3 w-3" /> },
   { key: "content", label: "Content", icon: <FileText className="h-3 w-3" /> },
+  { key: "cookies", label: "Cookies", icon: <Cookie className="h-3 w-3" /> },
+  { key: "security", label: "Security", icon: <Lock className="h-3 w-3" /> },
+  { key: "hreflang", label: "Hreflang", icon: <Languages className="h-3 w-3" /> },
   { key: "links_analysis", label: "Links", icon: <Network className="h-3 w-3" /> },
   { key: "duplicates", label: "Duplicates", icon: <Copy className="h-3 w-3" /> },
   { key: "issues", label: "Issues", icon: <AlertTriangle className="h-3 w-3" /> },
@@ -154,6 +157,15 @@ const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
   content: [
     { label: "All", filter: {} },
   ],
+  cookies: [
+    { label: "All", filter: {} },
+  ],
+  security: [
+    { label: "All", filter: {} },
+  ],
+  hreflang: [
+    { label: "All", filter: {} },
+  ],
   links_analysis: [
     { label: "All", filter: {} },
   ],
@@ -253,7 +265,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "links_analysis" && activeTab !== "duplicates",
+    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "links_analysis" && activeTab !== "duplicates",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -321,6 +333,27 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
     queryKey: ["crawl-content-analysis", crawlId],
     queryFn: () => urlsApi.contentAnalysis(crawlId),
     enabled: !!crawl && activeTab === "content" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: cookiesData, isLoading: cookiesLoading } = useQuery<any[]>({
+    queryKey: ["crawl-cookies", crawlId],
+    queryFn: () => urlsApi.cookiesAudit(crawlId),
+    enabled: !!crawl && activeTab === "cookies" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: securityData, isLoading: securityLoading } = useQuery<any>({
+    queryKey: ["crawl-security", crawlId],
+    queryFn: () => urlsApi.securityOverview(crawlId),
+    enabled: !!crawl && activeTab === "security" && isTerminal,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: hreflangData, isLoading: hreflangLoading } = useQuery<any[]>({
+    queryKey: ["crawl-hreflang", crawlId],
+    queryFn: () => urlsApi.hreflang(crawlId),
+    enabled: !!crawl && activeTab === "hreflang" && isTerminal,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -541,6 +574,12 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
               <CustomSearchTable items={csItems} loading={csLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             ) : activeTab === "content" ? (
               <ContentAnalysisPanel data={contentAnalysisData} loading={contentLoading} isTerminal={isTerminal} />
+            ) : activeTab === "cookies" ? (
+              <CookiesPanel data={cookiesData} loading={cookiesLoading} isTerminal={isTerminal} />
+            ) : activeTab === "security" ? (
+              <SecurityPanel data={securityData} loading={securityLoading} isTerminal={isTerminal} totalPages={crawledCount} />
+            ) : activeTab === "hreflang" ? (
+              <HreflangPanel data={hreflangData} loading={hreflangLoading} isTerminal={isTerminal} />
             ) : activeTab === "links_analysis" ? (
               <LinksAnalysisPanel data={linksAnalysisData} loading={linksLoading} isTerminal={isTerminal} linkScores={linkScoresData} />
             ) : activeTab === "duplicates" ? (
@@ -1496,4 +1535,181 @@ function ContentAnalysisPanel({ data, loading, isTerminal }: { data: any[] | und
     </div>
   );
 }
+function CookiesPanel({ data, loading, isTerminal }: { data: any[] | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Cookie audit available after crawl completes.</div>;
+  if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Auditing cookies...</div>;
+  if (!data || data.length === 0) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">No cookies detected — this site doesn&apos;t set any cookies.</div>;
+
+  const allCookies = data.flatMap((page: any) =>
+    (page.cookies || []).map((c: any) => ({ ...c, page_url: page.url }))
+  );
+  const thirdParty = allCookies.filter((c: any) => c.is_third_party);
+  const insecure = allCookies.filter((c: any) => c.issues && c.issues.length > 0);
+
+  return (
+    <div className="overflow-auto">
+      <div className="flex gap-3 p-3 border-b border-gray-200">
+        <div className="flex-1 p-2 bg-blue-50 rounded border border-blue-200 text-center">
+          <div className="text-[10px] text-blue-500 uppercase tracking-wide">Total Cookies</div>
+          <div className="text-lg font-bold text-blue-700">{allCookies.length}</div>
+        </div>
+        <div className="flex-1 p-2 bg-purple-50 rounded border border-purple-200 text-center">
+          <div className="text-[10px] text-purple-500 uppercase tracking-wide">Pages with Cookies</div>
+          <div className="text-lg font-bold text-purple-700">{data.length}</div>
+        </div>
+        <div className="flex-1 p-2 bg-orange-50 rounded border border-orange-200 text-center">
+          <div className="text-[10px] text-orange-500 uppercase tracking-wide">Third-Party</div>
+          <div className="text-lg font-bold text-orange-700">{thirdParty.length}</div>
+        </div>
+        <div className="flex-1 p-2 bg-red-50 rounded border border-red-200 text-center">
+          <div className="text-[10px] text-red-500 uppercase tracking-wide">Security Issues</div>
+          <div className="text-lg font-bold text-red-700">{insecure.length}</div>
+        </div>
+      </div>
+      <table className="w-full text-[11px]">
+        <thead className="bg-gray-50 sticky top-0">
+          <tr className="text-left text-[10px] text-gray-500 uppercase tracking-wider">
+            <th className="px-3 py-1.5 font-medium">Cookie Name</th>
+            <th className="px-3 py-1.5 font-medium">Domain</th>
+            <th className="px-3 py-1.5 font-medium text-center w-16">Secure</th>
+            <th className="px-3 py-1.5 font-medium text-center w-16">HttpOnly</th>
+            <th className="px-3 py-1.5 font-medium text-center w-20">SameSite</th>
+            <th className="px-3 py-1.5 font-medium text-center w-20">3rd Party</th>
+            <th className="px-3 py-1.5 font-medium">Issues</th>
+            <th className="px-3 py-1.5 font-medium">Page</th>
+          </tr>
+        </thead>
+        <tbody>
+          {allCookies.map((cookie: any, i: number) => (
+            <tr key={i} className={`border-t border-gray-100 hover:bg-blue-50/40 ${cookie.is_third_party ? "bg-orange-50/30" : ""}`}>
+              <td className="px-3 py-1.5 font-mono font-medium">{cookie.name}</td>
+              <td className="px-3 py-1.5 font-mono text-gray-600">{cookie.domain}</td>
+              <td className="px-3 py-1.5 text-center">{cookie.secure ? <span className="text-green-600">✓</span> : <span className="text-red-500">✗</span>}</td>
+              <td className="px-3 py-1.5 text-center">{cookie.httponly ? <span className="text-green-600">✓</span> : <span className="text-red-500">✗</span>}</td>
+              <td className="px-3 py-1.5 text-center font-mono">{cookie.samesite || <span className="text-gray-300">—</span>}</td>
+              <td className="px-3 py-1.5 text-center">{cookie.is_third_party ? <span className="text-orange-600 font-semibold">Yes</span> : <span className="text-gray-400">No</span>}</td>
+              <td className="px-3 py-1.5">{cookie.issues?.map((issue: string, j: number) => (
+                <span key={j} className="inline-block mr-1 px-1 py-0.5 text-[9px] bg-red-100 text-red-700 rounded">{issue.replace(/_/g, " ")}</span>
+              ))}</td>
+              <td className="px-3 py-1.5 truncate max-w-[200px] text-gray-500" title={cookie.page_url}>{truncateUrl(cookie.page_url, 30)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SecurityPanel({ data, loading, isTerminal, totalPages }: { data: any | undefined; loading: boolean; isTerminal: boolean; totalPages: number }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Security audit available after crawl completes.</div>;
+  if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Analyzing security...</div>;
+  if (!data) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">No security data available.</div>;
+
+  const httpsCount = data.https_count ?? 0;
+  const httpCount = data.http_count ?? 0;
+  const total = data.total_pages ?? totalPages;
+  const httpsPct = total > 0 ? ((httpsCount / total) * 100).toFixed(1) : "0";
+  const issues = data.issue_counts ?? {};
+
+  const headerChecks = [
+    { key: "missing_hsts", label: "Strict-Transport-Security (HSTS)", desc: "Prevents protocol downgrade attacks" },
+    { key: "missing_csp", label: "Content-Security-Policy (CSP)", desc: "Prevents XSS and injection attacks" },
+    { key: "missing_x_content_type_options", label: "X-Content-Type-Options", desc: "Prevents MIME type sniffing" },
+    { key: "missing_x_frame_options", label: "X-Frame-Options", desc: "Prevents clickjacking" },
+    { key: "mixed_content", label: "Mixed Content", desc: "HTTPS pages loading HTTP resources" },
+    { key: "http_url", label: "HTTP URLs", desc: "Pages served over insecure HTTP" },
+  ];
+
+  return (
+    <div className="overflow-auto">
+      <div className="flex gap-3 p-3 border-b border-gray-200">
+        <div className="flex-1 p-2 bg-green-50 rounded border border-green-200 text-center">
+          <div className="text-[10px] text-green-500 uppercase tracking-wide">HTTPS Pages</div>
+          <div className="text-lg font-bold text-green-700">{httpsCount} <span className="text-sm font-normal">({httpsPct}%)</span></div>
+        </div>
+        <div className="flex-1 p-2 bg-red-50 rounded border border-red-200 text-center">
+          <div className="text-[10px] text-red-500 uppercase tracking-wide">HTTP Pages</div>
+          <div className="text-lg font-bold text-red-700">{httpCount}</div>
+        </div>
+        <div className="flex-1 p-2 bg-blue-50 rounded border border-blue-200 text-center">
+          <div className="text-[10px] text-blue-500 uppercase tracking-wide">Total Analyzed</div>
+          <div className="text-lg font-bold text-blue-700">{total}</div>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-3">
+        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Security Headers</h3>
+        {headerChecks.map((check) => {
+          const count = issues[check.key] ?? 0;
+          const coverage = total > 0 ? total - count : 0;
+          const pct = total > 0 ? ((coverage / total) * 100).toFixed(0) : "100";
+          const isGood = count === 0;
+          return (
+            <div key={check.key} className="flex items-center gap-3 p-2 rounded border border-gray-100">
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isGood ? "bg-green-500" : count > total * 0.5 ? "bg-red-500" : "bg-amber-500"}`} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-medium text-gray-800">{check.label}</div>
+                <div className="text-[10px] text-gray-400">{check.desc}</div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className={`text-sm font-bold ${isGood ? "text-green-700" : "text-red-600"}`}>{pct}%</div>
+                <div className="text-[9px] text-gray-400">{count > 0 ? `${count} missing` : "All present"}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function HreflangPanel({ data, loading, isTerminal }: { data: any[] | undefined; loading: boolean; isTerminal: boolean }) {
+  if (!isTerminal) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Hreflang analysis available after crawl completes.</div>;
+  if (loading) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">Analyzing hreflang tags...</div>;
+  if (!data || data.length === 0) return <div className="flex items-center justify-center h-32 text-xs text-gray-400">No hreflang tags found on this site.</div>;
+
+  const allLangs = new Set<string>();
+  data.forEach((page: any) => {
+    (page.hreflang || []).forEach((h: any) => {
+      if (h.lang) allLangs.add(h.lang);
+    });
+  });
+
+  return (
+    <div className="overflow-auto">
+      <div className="flex gap-3 p-3 border-b border-gray-200">
+        <div className="flex-1 p-2 bg-blue-50 rounded border border-blue-200 text-center">
+          <div className="text-[10px] text-blue-500 uppercase tracking-wide">Pages with Hreflang</div>
+          <div className="text-lg font-bold text-blue-700">{data.length}</div>
+        </div>
+        <div className="flex-1 p-2 bg-purple-50 rounded border border-purple-200 text-center">
+          <div className="text-[10px] text-purple-500 uppercase tracking-wide">Languages</div>
+          <div className="text-lg font-bold text-purple-700">{allLangs.size}</div>
+          <div className="text-[9px] text-gray-400">{Array.from(allLangs).slice(0, 5).join(", ")}{allLangs.size > 5 ? "..." : ""}</div>
+        </div>
+      </div>
+      <table className="w-full text-[11px]">
+        <thead className="bg-gray-50 sticky top-0">
+          <tr className="text-left text-[10px] text-gray-500 uppercase tracking-wider">
+            <th className="px-3 py-1.5 font-medium">URL</th>
+            <th className="px-3 py-1.5 font-medium">Language</th>
+            <th className="px-3 py-1.5 font-medium">Alternate URL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.flatMap((page: any) =>
+            (page.hreflang || []).map((h: any, i: number) => (
+              <tr key={`${page.url_id}-${i}`} className="border-t border-gray-100 hover:bg-blue-50/40">
+                <td className="px-3 py-1.5 truncate max-w-[250px]" title={page.url}>{i === 0 ? truncateUrl(page.url, 40) : ""}</td>
+                <td className="px-3 py-1.5 font-mono font-medium">{h.lang || "x-default"}</td>
+                <td className="px-3 py-1.5 truncate max-w-[300px] text-gray-600" title={h.href}>{truncateUrl(h.href || "", 50)}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /* eslint-enable @typescript-eslint/no-explicit-any */

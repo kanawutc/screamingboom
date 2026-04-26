@@ -506,3 +506,35 @@ async def get_link_scores(
     """Get URLs ranked by Link Score (internal PageRank)."""
     repo = UrlRepository(db)
     return await repo.get_link_scores(crawl_id, limit=limit)
+
+
+@router.get("/crawls/{crawl_id}/cookies")
+async def get_cookies_audit(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(200, ge=1, le=1000),
+) -> list[dict]:
+    """Get cookie audit: pages with Set-Cookie headers and security flags."""
+    repo = UrlRepository(db)
+    return await repo.get_cookies_audit(crawl_id, limit=limit)
+
+
+@router.get("/crawls/{crawl_id}/security")
+async def get_security_overview(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+) -> dict:
+    """Get security overview: HTTPS adoption, security header coverage."""
+    repo = UrlRepository(db)
+    return await repo.get_security_overview(crawl_id)
+
+
+@router.get("/crawls/{crawl_id}/hreflang")
+async def get_hreflang_data(
+    crawl_id: uuid.UUID,
+    db: DbSession,
+    limit: int = Query(200, ge=1, le=1000),
+) -> list[dict]:
+    """Get pages with hreflang tags."""
+    repo = UrlRepository(db)
+    return await repo.get_hreflang_data(crawl_id, limit=limit)
