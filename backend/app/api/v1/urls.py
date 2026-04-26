@@ -623,7 +623,7 @@ async def get_summary_report(
     # Issue summary
     from app.repositories.issue_repo import IssueRepository
     issue_repo = IssueRepository(db)
-    issue_summary = await issue_repo.summary(crawl_id)
+    issue_summary = await issue_repo.get_summary(crawl_id)
 
     # Build report sections
     sections = []
@@ -656,10 +656,10 @@ async def get_summary_report(
 
     # Issues
     if issue_summary:
-        by_sev = issue_summary.get("by_severity", {})
+        by_sev = issue_summary.by_severity or {}
         sections.append({
             "title": "Issues Found",
-            "content": f"{issue_summary.get('total', 0)} total issues",
+            "content": f"{issue_summary.total} total issues",
             "details": [
                 f"Critical: {by_sev.get('critical', 0)}",
                 f"Warning: {by_sev.get('warning', 0)}",
