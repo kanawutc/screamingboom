@@ -13,7 +13,7 @@ import {
   Pause, Play, Square, Trash2, ArrowLeft, ExternalLink as ExternalLinkIcon, Globe,
   FileText, AlertTriangle, Hash, Type, Heading1, Heading2, Image,
   X, Download, Search, Link2, Shield, Navigation, FileCode2, Sheet, Braces,
-  FastForward, Network, Copy, Cookie, Lock, Languages, Timer, Bot, Map,
+  FastForward, Network, Copy, Cookie, Lock, Languages, Timer, Bot, Map, LayoutDashboard,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -33,11 +33,12 @@ function truncateUrl(url: string, maxLen = 80): string {
   return url.length <= maxLen ? url : url.slice(0, maxLen) + "\u2026";
 }
 
-type TabKey = "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "robots_txt" | "sitemaps" | "issues";
+type TabKey = "overview" | "internal" | "external" | "response_codes" | "redirects" | "page_titles" | "meta_desc" | "h1" | "h2" | "images" | "canonicals" | "directives" | "structured_data" | "custom_extraction" | "pagination" | "custom_search" | "content" | "performance" | "cookies" | "security" | "hreflang" | "links_analysis" | "duplicates" | "robots_txt" | "sitemaps" | "issues";
 
 interface TabDef { key: TabKey; label: string; icon: React.ReactNode; }
 
 const TABS: TabDef[] = [
+  { key: "overview", label: "Overview", icon: <LayoutDashboard className="h-3 w-3" /> },
   { key: "internal", label: "Internal", icon: <Globe className="h-3 w-3" /> },
   { key: "external", label: "External", icon: <ExternalLinkIcon className="h-3 w-3" /> },
   { key: "response_codes", label: "Response Codes", icon: <Hash className="h-3 w-3" /> },
@@ -71,6 +72,9 @@ interface SubFilter {
 }
 
 const SUB_FILTERS: Record<TabKey, SubFilter[]> = {
+  overview: [
+    { label: "All", filter: {} },
+  ],
   internal: [
     { label: "All", filter: {} },
     { label: "HTML", filter: { content_type: "text/html" } },
@@ -216,7 +220,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<TabKey>("internal");
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [activeSubFilter, setActiveSubFilter] = useState(0);
   const [selectedUrlId, setSelectedUrlId] = useState<string | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
@@ -281,7 +285,7 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
         status_code_max: urlQueryParams.status_code_max as number | undefined,
         has_issue: urlQueryParams.has_issue as string | undefined,
       }),
-    enabled: !!crawl && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "robots_txt" && activeTab !== "sitemaps",
+    enabled: !!crawl && activeTab !== "overview" && activeTab !== "issues" && activeTab !== "external" && activeTab !== "structured_data" && activeTab !== "custom_extraction" && activeTab !== "pagination" && activeTab !== "custom_search" && activeTab !== "content" && activeTab !== "performance" && activeTab !== "cookies" && activeTab !== "security" && activeTab !== "hreflang" && activeTab !== "redirects" && activeTab !== "links_analysis" && activeTab !== "duplicates" && activeTab !== "robots_txt" && activeTab !== "sitemaps",
   });
 
   const extNofollowFilter = currentFilter.nofollow as string | undefined;
@@ -612,7 +616,9 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-auto">
-            {activeTab === "issues" ? (
+            {activeTab === "overview" ? (
+              <OverviewPanel crawl={crawl} crawledCount={crawledCount} errorCount={errorCount} issueSummary={issueSummary} healthScore={healthScore} perfData={perfData} urlsPerSec={urlsPerSec} elapsed={elapsed} isTerminal={isTerminal} />
+            ) : activeTab === "issues" ? (
               <IssuesTable issues={issues} loading={issuesLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} />
             ) : activeTab === "external" ? (
               <ExternalLinksTable links={extLinks} loading={extLoading} crawlActive={isActive(effectiveStatus ?? crawl.status)} onSourceClick={(urlId) => { setSelectedUrlId(urlId); setDetailPanelOpen(true); }} />
@@ -651,7 +657,9 @@ export default function CrawlDetailPage({ params }: { params: Promise<{ crawlId:
 
           {/* PAGINATION */}
           <div className="flex items-center justify-between px-3 py-1 bg-white border-t border-gray-200 text-[11px] text-gray-500 flex-shrink-0">
-            {activeTab === "issues" ? (
+            {activeTab === "overview" || activeTab === "robots_txt" || activeTab === "sitemaps" ? (
+              <span>{crawledCount.toLocaleString()} URLs crawled{errorCount > 0 ? ` · ${errorCount} errors` : ""}</span>
+            ) : activeTab === "issues" ? (
               <>
                 <span>Showing {issues.length} issues</span>
                 <div className="flex gap-2">
@@ -1944,6 +1952,144 @@ function HreflangPanel({ data, loading, isTerminal }: { data: any[] | undefined;
           )}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ─── Overview Panel ───────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function OverviewPanel({ crawl, crawledCount, errorCount, issueSummary, healthScore, perfData, urlsPerSec, elapsed, isTerminal }: {
+  crawl: Crawl; crawledCount: number; errorCount: number;
+  issueSummary: any; healthScore: any; perfData: any;
+  urlsPerSec: number | null; elapsed: number | null; isTerminal: boolean;
+}) {
+  const config = crawl.config as Record<string, any>;
+  const score = healthScore?.score ?? null;
+  const grade = healthScore?.grade ?? null;
+  const avgMs = perfData?.average_ms ?? null;
+  const p95Ms = perfData?.p95_ms ?? null;
+
+  const gradeColor = (g: string | null) => {
+    if (!g) return "text-gray-400";
+    if (g === "A" || g === "A+") return "text-green-600";
+    if (g === "B") return "text-blue-600";
+    if (g === "C") return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  return (
+    <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(100vh-280px)]">
+      {/* Health Score + Key Metrics */}
+      <div className="grid grid-cols-6 gap-3">
+        <div className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col items-center justify-center">
+          <div className="text-[11px] text-gray-500 mb-1">Health Score</div>
+          {score !== null ? (
+            <>
+              <div className={`text-3xl font-bold ${gradeColor(grade)}`}>{grade}</div>
+              <div className="text-sm text-gray-600">{Math.round(score)}/100</div>
+            </>
+          ) : (
+            <div className="text-lg text-gray-300">{isTerminal ? "N/A" : "..."}</div>
+          )}
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-[11px] text-gray-500 mb-1">URLs Crawled</div>
+          <div className="text-2xl font-bold text-gray-900">{crawledCount.toLocaleString()}</div>
+          <div className="text-[10px] text-gray-400">of {(config.max_urls ?? 10000).toLocaleString()} max</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-[11px] text-gray-500 mb-1">Errors</div>
+          <div className={`text-2xl font-bold ${errorCount > 0 ? "text-red-600" : "text-green-700"}`}>{errorCount.toLocaleString()}</div>
+          <div className="text-[10px] text-gray-400">{crawledCount > 0 ? `${((errorCount / crawledCount) * 100).toFixed(1)}% error rate` : ""}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-[11px] text-gray-500 mb-1">Issues</div>
+          <div className="text-2xl font-bold text-gray-900">{issueSummary?.total?.toLocaleString() ?? (isTerminal ? "0" : "...")}</div>
+          {issueSummary?.by_severity?.critical > 0 && (
+            <div className="text-[10px] text-red-600">{issueSummary.by_severity.critical} critical</div>
+          )}
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-[11px] text-gray-500 mb-1">Avg Response</div>
+          <div className="text-2xl font-bold text-gray-900">{avgMs != null ? `${Math.round(avgMs)}ms` : (isTerminal ? "N/A" : "...")}</div>
+          {p95Ms != null && <div className="text-[10px] text-gray-400">P95: {Math.round(p95Ms)}ms</div>}
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-[11px] text-gray-500 mb-1">Speed</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {urlsPerSec != null ? `${urlsPerSec < 1 ? urlsPerSec.toFixed(2) : urlsPerSec.toFixed(1)}` : "—"}
+          </div>
+          <div className="text-[10px] text-gray-400">URLs/sec{elapsed != null ? ` · ${formatDuration(elapsed)}` : ""}</div>
+        </div>
+      </div>
+
+      {/* Health Score Breakdown + Issue Categories */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Health components */}
+        {healthScore?.components && (
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 className="text-xs font-semibold text-gray-700 mb-3">Health Score Breakdown</h3>
+            <div className="space-y-2">
+              {(healthScore.components as any[]).map((comp: any, i: number) => (
+                <div key={i}>
+                  <div className="flex justify-between text-[11px] mb-0.5">
+                    <span className="text-gray-600">{comp.name} ({comp.weight}%)</span>
+                    <span className="font-medium text-gray-900">{Math.round(comp.score)}/100</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${comp.score >= 80 ? "bg-green-500" : comp.score >= 60 ? "bg-yellow-500" : "bg-red-500"}`}
+                      style={{ width: `${Math.min(comp.score, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Issue breakdown by category */}
+        {issueSummary && Object.keys(issueSummary.by_category ?? {}).length > 0 && (
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 className="text-xs font-semibold text-gray-700 mb-3">Issues by Category</h3>
+            <div className="space-y-1.5">
+              {Object.entries(issueSummary.by_category as Record<string, number>)
+                .sort(([, a], [, b]) => (b as number) - (a as number))
+                .slice(0, 10)
+                .map(([cat, count]) => (
+                  <div key={cat} className="flex justify-between text-[11px]">
+                    <span className="text-gray-600 capitalize">{cat.replace(/_/g, " ")}</span>
+                    <span className="font-medium text-gray-900">{String(count)}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Crawl config summary */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h3 className="text-xs font-semibold text-gray-700 mb-3">Crawl Configuration</h3>
+        <div className="grid grid-cols-4 gap-4 text-[11px]">
+          <div><span className="text-gray-500">Mode:</span> <span className="font-medium">{crawl.mode === "spider" ? "Spider" : "List"}</span></div>
+          <div><span className="text-gray-500">Start URL:</span> <span className="font-medium font-mono">{String(config.start_url ?? "—").slice(0, 50)}</span></div>
+          <div><span className="text-gray-500">Max URLs:</span> <span className="font-medium">{(config.max_urls ?? 10000).toLocaleString()}</span></div>
+          <div><span className="text-gray-500">Max Depth:</span> <span className="font-medium">{config.max_depth ?? 10}</span></div>
+          <div><span className="text-gray-500">User Agent:</span> <span className="font-medium">{String(config.user_agent ?? "Default").slice(0, 30)}</span></div>
+          <div><span className="text-gray-500">Respect Robots:</span> <span className="font-medium">{config.respect_robots !== false ? "Yes" : "No"}</span></div>
+          <div><span className="text-gray-500">Rate Limit:</span> <span className="font-medium">{config.rate_limit_rps ?? "—"} req/s</span></div>
+          <div><span className="text-gray-500">JS Rendering:</span> <span className="font-medium">{config.render_js ? "Yes" : "No"}</span></div>
+        </div>
+      </div>
+
+      {/* Timestamps */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="grid grid-cols-3 gap-4 text-[11px]">
+          <div><span className="text-gray-500">Created:</span> <span className="font-medium">{new Date(crawl.created_at).toLocaleString()}</span></div>
+          <div><span className="text-gray-500">Started:</span> <span className="font-medium">{crawl.started_at ? new Date(crawl.started_at).toLocaleString() : "—"}</span></div>
+          <div><span className="text-gray-500">Completed:</span> <span className="font-medium">{crawl.completed_at ? new Date(crawl.completed_at).toLocaleString() : "—"}</span></div>
+        </div>
+      </div>
     </div>
   );
 }
