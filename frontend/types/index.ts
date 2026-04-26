@@ -360,3 +360,44 @@ export interface CrawlComparisonResponse {
 }
 
 export type ComparisonChangeType = "added" | "removed" | "changed" | "unchanged";
+
+// ─── Schedules ──────────────────────────────────────────────────────
+export interface ScheduleCrawlConfig {
+  start_url?: string | null;
+  max_urls?: number;
+  max_depth?: number;
+  max_threads?: number;
+  rate_limit_rps?: number;
+  user_agent?: string;
+  respect_robots?: boolean;
+  include_patterns?: string[];
+  exclude_patterns?: string[];
+}
+
+export interface ScheduleCreate {
+  name: string;
+  cron_expression: string;
+  crawl_config?: ScheduleCrawlConfig;
+  is_active?: boolean;
+}
+
+export interface ScheduleUpdate {
+  name?: string;
+  cron_expression?: string;
+  crawl_config?: ScheduleCrawlConfig;
+  is_active?: boolean;
+}
+
+export interface CrawlSchedule {
+  id: string;
+  project_id: string;
+  name: string;
+  cron_expression: string;
+  crawl_config: ScheduleCrawlConfig;
+  is_active: boolean;
+  last_run_at: string | null;
+  next_run_at: string | null;
+  last_crawl_id: string | null;
+  created_at: string;
+  updated_at: string;
+}

@@ -17,6 +17,7 @@ from redis.asyncio import Redis
 
 from app.core.config import settings
 from app.worker.tasks.crawl_tasks import start_crawl_job
+from app.worker.tasks.schedule_tasks import check_schedules_job
 
 logger = structlog.get_logger(__name__)
 
@@ -74,7 +75,10 @@ class WorkerSettings:
     """ARQ worker configuration."""
 
     redis_settings = _parse_redis_settings()
-    functions = [start_crawl_job]
+    functions = [start_crawl_job, check_schedules_job]
+    cron_jobs = [
+        cron(check_schedules_job, second={0}, unique=True),  # Every minute
+    ]
 
     # CRITICAL: these values are non-negotiable (see module docstring)
     job_timeout = None  # None = no timeout (24/7 crawling)

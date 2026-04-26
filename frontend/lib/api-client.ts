@@ -24,6 +24,9 @@ import type {
   ProjectUpdate,
   StructuredDataItem,
   UrlFilterParams,
+  CrawlSchedule,
+  ScheduleCreate,
+  ScheduleUpdate,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -364,6 +367,31 @@ export const extractionRulesApi = {
 
   delete: (projectId: string, ruleId: string) =>
     request<void>(`/projects/${projectId}/extraction-rules/${ruleId}`, {
+      method: "DELETE",
+    }),
+};
+
+export const schedulesApi = {
+  list: (projectId: string) =>
+    request<CrawlSchedule[]>(`/projects/${projectId}/schedules`),
+
+  create: (projectId: string, data: ScheduleCreate) =>
+    request<CrawlSchedule>(`/projects/${projectId}/schedules`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  get: (projectId: string, scheduleId: string) =>
+    request<CrawlSchedule>(`/projects/${projectId}/schedules/${scheduleId}`),
+
+  update: (projectId: string, scheduleId: string, data: ScheduleUpdate) =>
+    request<CrawlSchedule>(`/projects/${projectId}/schedules/${scheduleId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (projectId: string, scheduleId: string) =>
+    request<void>(`/projects/${projectId}/schedules/${scheduleId}`, {
       method: "DELETE",
     }),
 };

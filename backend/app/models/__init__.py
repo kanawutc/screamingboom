@@ -8,6 +8,7 @@ from app.models.link import PageLink
 from app.models.issue import UrlIssue
 from app.models.redirect import Redirect
 from app.models.extraction_rule import ExtractionRule
+from app.models.schedule import CrawlSchedule
 
 __all__ = [
     "Base",
@@ -18,4 +19,5 @@ __all__ = [
     "UrlIssue",
     "Redirect",
     "ExtractionRule",
+    "CrawlSchedule",
 ]
